@@ -411,13 +411,16 @@
           phaseId, 
           position,
           onUpdate, 
-          onClose 
+          onClose,
+          onUpdatePosition
         }) => {
           const [editData, setEditData] = useState({
             name: candidate?.name || '',
             notes: candidate?.notes || '',
             customFields: candidate?.customFields || {}
           });
+          const [showFieldManager, setShowFieldManager] = useState(false);
+          const [newQuickField, setNewQuickField] = useState({ name: '', type: 'text', required: false });
 
           useEffect(() => {
             if (candidate) {
@@ -441,6 +444,44 @@
             }));
           };
 
+          const handleAddQuickField = () => {
+            if (!newQuickField.name.trim()) return;
+            
+            const newField = {
+              id: `field_${Date.now()}`,
+              name: newQuickField.name.trim(),
+              type: newQuickField.type,
+              required: newQuickField.required,
+              options: newQuickField.type === 'select' ? [] : undefined
+            };
+
+            const updatedPosition = {
+              ...position,
+              customFields: [...(position.customFields || []), newField]
+            };
+
+            onUpdatePosition(position.id, updatedPosition);
+            setNewQuickField({ name: '', type: 'text', required: false });
+          };
+
+          const handleDeleteField = (fieldId) => {
+            const fieldToDelete = position.customFields?.find(f => f.id === fieldId);
+            if (confirm(`「${fieldToDelete?.name}」フィールドを削除しますか？\n\n⚠️ 注意: このフィールドのデータは全ての候補者から失われます。`)) {
+              const updatedPosition = {
+                ...position,
+                customFields: position.customFields?.filter(f => f.id !== fieldId) || []
+              };
+              onUpdatePosition(position.id, updatedPosition);
+              
+              // 現在編集中のデータからも削除
+              setEditData(prev => {
+                const newCustomFields = { ...prev.customFields };
+                delete newCustomFields[fieldId];
+                return { ...prev, customFields: newCustomFields };
+              });
+            }
+          };
+
           const handleSave = () => {
             onUpdate(phaseId, candidate.id, editData);
             onClose();
@@ -448,65 +489,173 @@
 
           return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-96 overflow-y-auto">
-                <h3 className="text-lg font-semibold mb-4">候補者詳細編集</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      候補者名 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editData.name}
-                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2"
-                      required
-                    />
-                  </div>
+              <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">候補者詳細編集</h3>
+                  <button
+                    onClick={() => setShowFieldManager(!showFieldManager)}
+                    className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded border"
+                  >
+                    {showFieldManager ? '📝 入力画面' : '⚙️ フィールド管理'}
+                  </button>
+                </div>
 
-                  {/* カスタムフィールド */}
-                  {position?.customFields?.map((field) => (
-                    <div key={field.id}>
+                {showFieldManager ? (
+                  // フィールド管理画面
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-3 text-blue-800">🆕 新しいフィールドを追加</h4>
+                      <div className="space-y-3">
+                        <div className="flex space-x-2">
+                          <input
+                            type="text"
+                            placeholder="フィールド名"
+                            value={newQuickField.name}
+                            onChange={(e) => setNewQuickField(prev => ({ ...prev, name: e.target.value }))}
+                            className="flex-1 border rounded px-3 py-2 text-sm"
+                          />
+                          <select
+                            value={newQuickField.type}
+                            onChange={(e) => setNewQuickField(prev => ({ ...prev, type: e.target.value }))}
+                            className="border rounded px-2 py-2 text-sm"
+                          >
+                            {FIELD_TYPES.map(type => (
+                              <option key={type.value} value={type.value}>
+                                {type.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={newQuickField.required}
+                              onChange={(e) => setNewQuickField(prev => ({ ...prev, required: e.target.checked }))}
+                            />
+                            <span className="text-sm">必須項目</span>
+                          </label>
+                          <button
+                            onClick={handleAddQuickField}
+                            disabled={!newQuickField.name.trim()}
+                            className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-4 py-2 rounded text-sm"
+                          >
+                            追加
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-gray-800">📋 現在のカスタムフィールド</h4>
+                      {position.customFields?.length === 0 && (
+                        <p className="text-sm text-gray-500 py-4 text-center">まだカスタムフィールドがありません</p>
+                      )}
+                      {position.customFields?.map((field) => (
+                        <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                          <div className="flex items-center space-x-3">
+                            <span className="font-medium text-sm">{field.name}</span>
+                            <span className="text-xs bg-gray-200 px-2 py-1 rounded">
+                              {FIELD_TYPES.find(t => t.value === field.type)?.label}
+                            </span>
+                            {field.required && (
+                              <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">必須</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteField(field.id)}
+                            className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                            title="削除"
+                          >
+                            <Trash2 />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  // 入力画面
+                  <div className="space-y-4">
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {field.name}
-                        {field.required && <span className="text-red-500"> *</span>}
+                        候補者名 <span className="text-red-500">*</span>
                       </label>
-                      <CustomFieldInput
-                        field={field}
-                        value={editData.customFields[field.id]}
-                        onChange={handleCustomFieldChange}
+                      <input
+                        type="text"
+                        value={editData.name}
+                        onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-2"
+                        required
                       />
                     </div>
-                  ))}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      メモ・詳細情報
-                    </label>
-                    <textarea
-                      value={editData.notes}
-                      onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2 h-32 resize-none"
-                      placeholder="候補者に関するメモや詳細情報を入力してください..."
-                    />
+                    {/* カスタムフィールド */}
+                    {position?.customFields?.length === 0 && (
+                      <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <p className="text-sm text-gray-500 mb-2">まだカスタムフィールドがありません</p>
+                        <button
+                          onClick={() => setShowFieldManager(true)}
+                          className="text-blue-500 hover:text-blue-700 text-sm font-medium"
+                        >
+                          ⚙️ フィールドを追加する
+                        </button>
+                      </div>
+                    )}
+                    {position?.customFields?.map((field) => (
+                      <div key={field.id}>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-sm font-medium text-gray-700">
+                            {field.name}
+                            {field.required && <span className="text-red-500"> *</span>}
+                          </label>
+                          <button
+                            onClick={() => handleDeleteField(field.id)}
+                            className="text-gray-400 hover:text-red-500 p-1"
+                            title="このフィールドを削除"
+                          >
+                            <Trash2 />
+                          </button>
+                        </div>
+                        <CustomFieldInput
+                          field={field}
+                          value={editData.customFields[field.id]}
+                          onChange={handleCustomFieldChange}
+                        />
+                      </div>
+                    ))}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        メモ・詳細情報
+                      </label>
+                      <textarea
+                        value={editData.notes}
+                        onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-2 h-32 resize-none"
+                        placeholder="候補者に関するメモや詳細情報を入力してください..."
+                      />
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      <strong>登録日:</strong> {new Date(candidate.createdAt).toLocaleDateString()}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    <strong>登録日:</strong> {new Date(candidate.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-                <div className="flex space-x-2 mt-6">
+                )}
+
+                <div className="flex space-x-2 mt-6 pt-4 border-t">
                   <button
                     onClick={onClose}
                     className="flex-1 bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg"
                   >
                     キャンセル
                   </button>
-                  <button
-                    onClick={handleSave}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                  >
-                    保存
-                  </button>
+                  {!showFieldManager && (
+                    <button
+                      onClick={handleSave}
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                    >
+                      保存
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1146,6 +1295,7 @@
                             phaseId={detailEditingPhase}
                             position={selectedPosition}
                             onUpdate={updateCandidate}
+                            onUpdatePosition={updatePosition}
                             onClose={() => {
                                 setDetailModalOpen(false);
                                 setDetailEditingCandidate(null);
