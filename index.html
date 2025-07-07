@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>採用管理システム</title>
+    <title>採用管理システム（チーム共有版）</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -23,7 +23,7 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useCallback, useMemo } = React;
+        const { useState, useCallback, useEffect } = React;
 
         // アイコンコンポーネント
         const Plus = () => (
@@ -76,6 +76,26 @@
             </svg>
         );
 
+        const Wifi = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="m1 9 4-4 4 4"/>
+                <path d="m1 9 4-4 4 4"/>
+                <circle cx="12" cy="19" r="1"/>
+                <path d="M5 12.859a10 10 0 0 1 14 0"/>
+                <path d="M8.5 16.429a5 5 0 0 1 7 0"/>
+            </svg>
+        );
+
+        const WifiOff = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="m12 20 3-3 3 3-3 3-3-3z"/>
+                <path d="M8.5 16.429a5 5 0 0 1 7 0"/>
+                <path d="M5 12.859a10 10 0 0 1 5.17-2.69"/>
+                <path d="m2 2 20 20"/>
+                <path d="M16.83 10.17a10 10 0 0 1 2.17 2.69"/>
+            </svg>
+        );
+
         // 採用者属性の定数
         const HIRING_ATTRIBUTES = [
           { value: 'experienced', label: '経験者' },
@@ -97,13 +117,220 @@
           { id: 'rejected', name: '不合格', color: 'bg-red-500' }
         ];
 
+        // データベース操作クラス
+        class DatabaseManager {
+            constructor() {
+                this.isOnline = navigator.onLine;
+                this.setupOnlineListener();
+            }
+
+            setupOnlineListener() {
+                window.addEventListener('online', () => {
+                    this.isOnline = true;
+                    this.syncLocalToRemote();
+                });
+                window.addEventListener('offline', () => {
+                    this.isOnline = false;
+                });
+            }
+
+            async saveData(data) {
+                try {
+                    // 常にローカルストレージにバックアップ保存
+                    localStorage.setItem('recruitmentPositions', JSON.stringify(data));
+                    localStorage.setItem('lastLocalUpdate', new Date().toISOString());
+
+                    // オンラインの場合は共有データベースにも保存
+                    if (this.isOnline) {
+                        const response = await fetch('/api/positions', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer sarowin-team'
+                            },
+                            body: JSON.stringify({
+                                data: data,
+                                timestamp: new Date().toISOString(),
+                                userId: this.getUserId()
+                            })
+                        });
+
+                        if (response.ok) {
+                            localStorage.setItem('lastSuccessfulSync', new Date().toISOString());
+                            return { success: true, source: 'remote' };
+                        } else {
+                            throw new Error('Remote save failed');
+                        }
+                    } else {
+                        // オフラインの場合は待機中としてマーク
+                        localStorage.setItem('pendingSync', 'true');
+                        return { success: true, source: 'local' };
+                    }
+                } catch (error) {
+                    console.error('Save failed:', error);
+                    // リモート保存に失敗してもローカルには保存されている
+                    localStorage.setItem('pendingSync', 'true');
+                    return { success: true, source: 'local', error: error.message };
+                }
+            }
+
+            async loadData() {
+                try {
+                    if (this.isOnline) {
+                        // オンラインの場合は最新データを取得
+                        const response = await fetch('/api/positions', {
+                            headers: { 'Authorization': 'Bearer sarowin-team' }
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.data && Array.isArray(result.data)) {
+                                // リモートデータをローカルにも保存
+                                localStorage.setItem('recruitmentPositions', JSON.stringify(result.data));
+                                localStorage.setItem('lastSuccessfulSync', new Date().toISOString());
+                                return { data: result.data, source: 'remote', timestamp: result.timestamp };
+                            }
+                        }
+                    }
+
+                    // オフラインまたはリモート取得失敗時はローカルデータを使用
+                    const localData = localStorage.getItem('recruitmentPositions');
+                    if (localData) {
+                        const data = JSON.parse(localData);
+                        return { 
+                            data: data, 
+                            source: 'local',
+                            timestamp: localStorage.getItem('lastLocalUpdate')
+                        };
+                    }
+
+                    // 初回起動時のデフォルトデータ
+                    return { data: this.getDefaultData(), source: 'default' };
+
+                } catch (error) {
+                    console.error('Load failed:', error);
+                    // エラー時はローカルデータまたはデフォルトデータを返す
+                    const localData = localStorage.getItem('recruitmentPositions');
+                    if (localData) {
+                        try {
+                            return { data: JSON.parse(localData), source: 'local' };
+                        } catch {
+                            return { data: this.getDefaultData(), source: 'default' };
+                        }
+                    }
+                    return { data: this.getDefaultData(), source: 'default' };
+                }
+            }
+
+            async syncLocalToRemote() {
+                const pendingSync = localStorage.getItem('pendingSync');
+                if (pendingSync === 'true' && this.isOnline) {
+                    const localData = localStorage.getItem('recruitmentPositions');
+                    if (localData) {
+                        try {
+                            const data = JSON.parse(localData);
+                            await this.saveData(data);
+                            localStorage.removeItem('pendingSync');
+                        } catch (error) {
+                            console.error('Sync failed:', error);
+                        }
+                    }
+                }
+            }
+
+            getUserId() {
+                let userId = localStorage.getItem('userId');
+                if (!userId) {
+                    userId = 'user_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('userId', userId);
+                }
+                return userId;
+            }
+
+            getDefaultData() {
+                return [
+                    { 
+                      id: 1, 
+                      name: 'ネイル本部人員（セールス＆CS）',
+                      department: 'リテール事業部',
+                      hiringManager: '田中マネージャー',
+                      hiringAttribute: 'experienced',
+                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] }))
+                    },
+                    { 
+                      id: 2, 
+                      name: 'アイリスト本部人員（セールス＆CS）',
+                      department: 'リテール事業部',
+                      hiringManager: '山田部長',
+                      hiringAttribute: 'potential',
+                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] }))
+                    }
+                ];
+            }
+
+            getConnectionStatus() {
+                const lastSync = localStorage.getItem('lastSuccessfulSync');
+                const pendingSync = localStorage.getItem('pendingSync') === 'true';
+                
+                return {
+                    isOnline: this.isOnline,
+                    lastSync: lastSync ? new Date(lastSync) : null,
+                    pendingSync: pendingSync
+                };
+            }
+        }
+
+        // 接続ステータス表示コンポーネント
+        const ConnectionStatus = ({ dbManager, dataSource, lastUpdate }) => {
+            const [status, setStatus] = useState(dbManager.getConnectionStatus());
+
+            useEffect(() => {
+                const updateStatus = () => setStatus(dbManager.getConnectionStatus());
+                
+                window.addEventListener('online', updateStatus);
+                window.addEventListener('offline', updateStatus);
+                
+                return () => {
+                    window.removeEventListener('online', updateStatus);
+                    window.removeEventListener('offline', updateStatus);
+                };
+            }, [dbManager]);
+
+            const getStatusColor = () => {
+                if (!status.isOnline) return 'bg-red-100 text-red-800';
+                if (status.pendingSync) return 'bg-yellow-100 text-yellow-800';
+                return 'bg-green-100 text-green-800';
+            };
+
+            const getStatusText = () => {
+                if (!status.isOnline) return 'オフライン（ローカル保存のみ）';
+                if (status.pendingSync) return 'オンライン（同期待ち）';
+                return 'オンライン（同期済み）';
+            };
+
+            return (
+                <div className="fixed top-4 left-4 z-50">
+                    <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm ${getStatusColor()}`}>
+                        {status.isOnline ? <Wifi /> : <WifiOff />}
+                        <span>{getStatusText()}</span>
+                    </div>
+                    {dataSource && (
+                        <div className="text-xs text-gray-500 mt-1 px-3">
+                            データ: {dataSource === 'remote' ? 'チーム共有' : dataSource === 'local' ? 'ローカル' : '初期設定'}
+                            {lastUpdate && ` (${new Date(lastUpdate).toLocaleString()})`}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         // ログインコンポーネント
         const LoginComponent = ({ onLogin }) => {
             const [password, setPassword] = useState('');
             
             const handleSubmit = (e) => {
                 e.preventDefault();
-                if (password === 'company2024') {
+                if (password === 'sarowin2024') {
                     onLogin();
                 } else {
                     alert('パスワードが正しくありません');
@@ -113,8 +340,8 @@
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-100">
                     <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-                        <h2 className="text-2xl font-bold mb-6 text-center">社内メンバー専用</h2>
-                        <p className="text-gray-600 mb-4 text-center">採用管理システムにアクセスするには<br/>パスワードを入力してください</p>
+                        <h2 className="text-2xl font-bold mb-6 text-center">サロウィン社内専用</h2>
+                        <p className="text-gray-600 mb-4 text-center">採用管理システム（チーム共有版）<br/>パスワードを入力してください</p>
                         <form onSubmit={handleSubmit}>
                             <input
                                 type="password"
@@ -131,6 +358,9 @@
                                 ログイン
                             </button>
                         </form>
+                        <div className="mt-4 text-xs text-gray-500 text-center">
+                            チーム全体でデータを共有します
+                        </div>
                     </div>
                 </div>
             );
@@ -479,53 +709,10 @@
 
         // 採用管理システム
         const RecruitmentSystem = () => {
-            const [positions, setPositions] = useState(() => {
-                const saved = localStorage.getItem('recruitmentPositions');
-                if (saved) {
-                    try {
-                        return JSON.parse(saved);
-                    } catch {
-                        return [];
-                    }
-                }
-                return [
-                    { 
-                      id: 1, 
-                      name: 'ネイル本部人員（セールス＆CS）',
-                      department: 'リテール事業部',
-                      hiringManager: '田中マネージャー',
-                      hiringAttribute: 'experienced',
-                      phases: [
-                        { ...RECRUITMENT_PHASES[0], candidates: [
-                          { id: 'pos1-app1', name: 'Aさん', notes: '経験豊富。前職でネイル業界5年の経験あり。', createdAt: new Date().toISOString() },
-                          { id: 'pos1-app2', name: 'Bさん', notes: '', createdAt: new Date().toISOString() }
-                        ]},
-                        { ...RECRUITMENT_PHASES[1], candidates: [
-                          { id: 'pos1-scr1', name: 'Cさん', notes: '書類通過。資格多数保有。', createdAt: new Date().toISOString() }
-                        ]},
-                        ...RECRUITMENT_PHASES.slice(2).map(phase => ({ ...phase, candidates: [] }))
-                      ]
-                    },
-                    { 
-                      id: 2, 
-                      name: 'アイリスト本部人員（セールス＆CS）',
-                      department: 'リテール事業部',
-                      hiringManager: '山田部長',
-                      hiringAttribute: 'potential',
-                      phases: [
-                        { ...RECRUITMENT_PHASES[0], candidates: [
-                          { id: 'pos2-app1', name: 'Dさん', notes: '', createdAt: new Date().toISOString() }
-                        ]},
-                        { ...RECRUITMENT_PHASES[1], candidates: [] },
-                        { ...RECRUITMENT_PHASES[2], candidates: [
-                          { id: 'pos2-int1', name: 'Eさん', notes: '面接良好。コミュニケーション能力高い。', createdAt: new Date().toISOString() }
-                        ]},
-                        ...RECRUITMENT_PHASES.slice(3).map(phase => ({ ...phase, candidates: [] }))
-                      ]
-                    }
-                ];
-            });
-
+            const [dbManager] = useState(() => new DatabaseManager());
+            const [positions, setPositions] = useState([]);
+            const [dataSource, setDataSource] = useState(null);
+            const [lastUpdate, setLastUpdate] = useState(null);
             const [selectedPosition, setSelectedPosition] = useState(null);
             const [selectedCandidate, setSelectedCandidate] = useState(null);
             const [newTaskInputs, setNewTaskInputs] = useState({});
@@ -542,14 +729,47 @@
             const [detailEditingCandidate, setDetailEditingCandidate] = useState(null);
             const [detailEditingPhase, setDetailEditingPhase] = useState(null);
 
-            // データをローカルストレージに保存
-            const saveData = useCallback((data) => {
-                try {
-                    localStorage.setItem('recruitmentPositions', JSON.stringify(data));
-                } catch (error) {
-                    console.error('Failed to save to localStorage:', error);
+            // 初期データ読み込み
+            useEffect(() => {
+                const loadInitialData = async () => {
+                    const result = await dbManager.loadData();
+                    setPositions(result.data);
+                    setDataSource(result.source);
+                    setLastUpdate(result.timestamp);
+                };
+                loadInitialData();
+            }, [dbManager]);
+
+            // データを保存
+            const saveData = useCallback(async (data) => {
+                const result = await dbManager.saveData(data);
+                if (result.success) {
+                    setLastUpdate(new Date().toISOString());
+                    if (result.error) {
+                        // リモート保存失敗の場合は警告表示（オプション）
+                        console.warn('Remote save failed, saved locally:', result.error);
+                    }
                 }
-            }, []);
+            }, [dbManager]);
+
+            // 定期的にリモートデータをチェック（オプション）
+            useEffect(() => {
+                const interval = setInterval(async () => {
+                    if (navigator.onLine) {
+                        try {
+                            const result = await dbManager.loadData();
+                            if (result.source === 'remote' && result.timestamp !== lastUpdate) {
+                                setPositions(result.data);
+                                setLastUpdate(result.timestamp);
+                            }
+                        } catch (error) {
+                            console.log('Periodic sync failed:', error);
+                        }
+                    }
+                }, 30000); // 30秒ごと
+
+                return () => clearInterval(interval);
+            }, [dbManager, lastUpdate]);
 
             // 候補者選択
             const handleCandidateClick = useCallback((candidate) => {
@@ -756,6 +976,12 @@
 
                 return (
                     <div className="p-6 bg-gray-100 min-h-screen">
+                        <ConnectionStatus 
+                            dbManager={dbManager} 
+                            dataSource={dataSource} 
+                            lastUpdate={lastUpdate} 
+                        />
+                        
                         <div className="mb-6">
                             <button
                                 onClick={() => {
@@ -859,8 +1085,14 @@
             // メイン画面表示
             return (
                 <div className="p-6 bg-gray-100 min-h-screen">
-                    <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理</h1>
+                    <ConnectionStatus 
+                        dbManager={dbManager} 
+                        dataSource={dataSource} 
+                        lastUpdate={lastUpdate} 
+                    />
+                    
+                    <div className="flex items-center justify-between mb-6 mt-16">
+                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（チーム共有版）</h1>
                         <button
                             onClick={() => setShowAddPosition(true)}
                             className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
