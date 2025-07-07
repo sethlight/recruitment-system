@@ -1409,6 +1409,35 @@
 
             // 初期データ読み込み
             useEffect(() => {
+                // localStorageからデータを読み込み
+                const savedData = localStorage.getItem('salowin_recruitment_data');
+                
+                if (savedData) {
+                    try {
+                        const parsedData = JSON.parse(savedData);
+                        setPositions(parsedData);
+                        console.log('保存済みデータを読み込みました');
+                    } catch (error) {
+                        console.error('データの読み込みに失敗しました:', error);
+                        // エラーの場合はデフォルトデータを使用
+                        loadDefaultData();
+                    }
+                } else {
+                    // 初回アクセスの場合はデフォルトデータを読み込み
+                    loadDefaultData();
+                }
+            }, []);
+
+            // データ保存
+            useEffect(() => {
+                if (positions.length > 0) {
+                    localStorage.setItem('salowin_recruitment_data', JSON.stringify(positions));
+                    console.log('データを保存しました');
+                }
+            }, [positions]);
+
+            // デフォルトデータ読み込み関数
+            const loadDefaultData = () => {
                 const defaultData = [
                     { 
                       id: 1, 
@@ -1437,7 +1466,7 @@
                     }
                 ];
                 setPositions(defaultData);
-            }, []);
+            };
 
             // 候補者選択
             const handleCandidateClick = useCallback((candidate) => {
@@ -1636,10 +1665,60 @@
                 }
             }, [positions, selectedPosition]);
 
-            const getPositionStats = (position) => {
-                const totalCandidates = position.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
-                return { totalCandidates };
-            };
+            // データリセット機能
+            const resetAllData = useCallback(() => {
+                if (confirm('⚠️ 警告: すべてのデータが削除されます\n\n・全ての候補者データ\n・カスタムフィールド設定\n・フェーズ設定\n・移動履歴\n\nこの操作は取り消せません。本当にリセットしますか？')) {
+                    localStorage.removeItem('salowin_recruitment_data');
+                    loadDefaultData();
+                    setSelectedPosition(null);
+                    setSelectedCandidate(null);
+                    alert('✅ データをリセットしました。初期状態に戻りました。');
+                }
+            }, []);
+
+            // データエクスポート機能
+            const exportData = useCallback(() => {
+                try {
+                    const dataStr = JSON.stringify(positions, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `salowin_recruitment_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    alert('✅ データをエクスポートしました！');
+                } catch (error) {
+                    alert('❌ エクスポートに失敗しました: ' + error.message);
+                }
+            }, [positions]);
+
+            // データインポート機能
+            const importData = useCallback((event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (Array.isArray(importedData) && importedData.length > 0) {
+                            if (confirm('現在のデータを上書きしてインポートしますか？\n\n⚠️ 現在のデータは失われます。')) {
+                                setPositions(importedData);
+                                localStorage.setItem('salowin_recruitment_data', JSON.stringify(importedData));
+                                alert('✅ データをインポートしました！');
+                            }
+                        } else {
+                            alert('❌ 無効なデータ形式です。');
+                        }
+                    } catch (error) {
+                        alert('❌ ファイルの読み込みに失敗しました: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+                // ファイル入力をリセット
+                event.target.value = '';
+            }, []);
 
             // カンバンボード表示
             if (selectedPosition) {
@@ -1785,13 +1864,42 @@
                 <div className="p-6 bg-gray-100 min-h-screen">
                     <div className="flex items-center justify-between mb-6">
                         <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（社内共有版）</h1>
-                        <button
-                            onClick={() => setShowAddPosition(true)}
-                            className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                        >
-                            <Plus />
-                            <span>新規ポジション追加</span>
-                        </button>
+                        <div className="flex items-center space-x-2">
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    accept=".json"
+                                    onChange={importData}
+                                    className="hidden"
+                                    id="import-file"
+                                />
+                                <label
+                                    htmlFor="import-file"
+                                    className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg cursor-pointer text-sm"
+                                >
+                                    <span>📁 インポート</span>
+                                </label>
+                            </div>
+                            <button
+                                onClick={exportData}
+                                className="flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg text-sm"
+                            >
+                                <span>💾 エクスポート</span>
+                            </button>
+                            <button
+                                onClick={resetAllData}
+                                className="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm"
+                            >
+                                <span>🗑️ データリセット</span>
+                            </button>
+                            <button
+                                onClick={() => setShowAddPosition(true)}
+                                className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                            >
+                                <Plus />
+                                <span>新規ポジション追加</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -2018,7 +2126,8 @@
                         </form>
                         <div className="mt-4 text-xs text-gray-500 text-center">
                             社内チーム全体でデータを共有します<br/>
-                            フェーズ編集＆カスタムフィールド機能付き
+                            フェーズ編集＆カスタムフィールド機能付き<br/>
+                            <span className="text-green-600">💾 データは自動保存されます</span>
                         </div>
                     </div>
                 </div>
@@ -2027,14 +2136,20 @@
 
         // メインアプリ
         const App = () => {
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [isAuthenticated, setIsAuthenticated] = useState(() => {
+                // ログイン状態も保存
+                const savedAuth = localStorage.getItem('salowin_auth_status');
+                return savedAuth === 'true';
+            });
 
             const handleLogin = () => {
                 setIsAuthenticated(true);
+                localStorage.setItem('salowin_auth_status', 'true');
             };
 
             const handleLogout = () => {
                 setIsAuthenticated(false);
+                localStorage.removeItem('salowin_auth_status');
             };
 
             if (!isAuthenticated) {
