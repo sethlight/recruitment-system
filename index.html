@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>採用管理システム（カスタムフィールド版）</title>
+    <title>採用管理システム（社内共有版）</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -222,16 +222,26 @@
             };
 
             const handleDeleteField = (fieldId) => {
-                if (confirm('このフィールドを削除しますか？')) {
+                const fieldToDelete = editingFields.find(f => f.id === fieldId);
+                if (confirm(`「${fieldToDelete?.name}」フィールドを削除しますか？\n\n⚠️ 注意: このフィールドに入力済みの候補者データも全て失われます。`)) {
                     setEditingFields(prev => prev.filter(field => field.id !== fieldId));
                 }
             };
 
             const handleAddOption = (fieldId) => {
-                const option = prompt('選択肢を入力してください:');
-                if (option) {
+                const option = prompt('新しい選択肢を入力してください:\n\n例: 初級、中級、上級');
+                if (option && option.trim()) {
+                    const trimmedOption = option.trim();
+                    const field = editingFields.find(f => f.id === fieldId);
+                    const existingOptions = field?.options || [];
+                    
+                    if (existingOptions.includes(trimmedOption)) {
+                        alert('その選択肢は既に存在します。');
+                        return;
+                    }
+                    
                     handleFieldUpdate(fieldId, {
-                        options: [...(editingFields.find(f => f.id === fieldId)?.options || []), option]
+                        options: [...existingOptions, trimmedOption]
                     });
                 }
             };
@@ -250,19 +260,26 @@
                         <h3 className="text-lg font-semibold mb-4">カスタムフィールド設定 - {position.name}</h3>
                         
                         <div className="space-y-3 mb-6">
+                            {editingFields.length === 0 && (
+                                <div className="text-center py-8 text-gray-500">
+                                    <p className="text-sm">まだカスタムフィールドが設定されていません</p>
+                                    <p className="text-xs mt-1">下記のフォームから新しいフィールドを追加してください</p>
+                                </div>
+                            )}
                             {editingFields.map((field) => (
-                                <div key={field.id} className="border rounded-lg p-3">
+                                <div key={field.id} className="border rounded-lg p-3 bg-gray-50">
                                     <div className="flex items-center space-x-3 mb-2">
                                         <input
                                             type="text"
                                             value={field.name}
                                             onChange={(e) => handleFieldUpdate(field.id, { name: e.target.value })}
-                                            className="flex-1 border rounded px-2 py-1 font-medium"
+                                            className="flex-1 border rounded px-2 py-1 font-medium bg-white"
+                                            placeholder="フィールド名を入力"
                                         />
                                         <select
                                             value={field.type}
                                             onChange={(e) => handleFieldUpdate(field.id, { type: e.target.value })}
-                                            className="border rounded px-2 py-1"
+                                            className="border rounded px-2 py-1 bg-white"
                                         >
                                             {FIELD_TYPES.map(type => (
                                                 <option key={type.value} value={type.value}>
@@ -280,34 +297,39 @@
                                         </label>
                                         <button
                                             onClick={() => handleDeleteField(field.id)}
-                                            className="text-red-500 hover:text-red-700 p-1"
+                                            className="text-red-500 hover:text-red-700 p-1 bg-white rounded border hover:bg-red-50"
+                                            title="このフィールドを削除"
                                         >
                                             <Trash2 />
                                         </button>
                                     </div>
                                     
                                     {field.type === 'select' && (
-                                        <div className="ml-4">
+                                        <div className="ml-4 mt-3 p-3 bg-white rounded border">
                                             <div className="flex items-center space-x-2 mb-2">
-                                                <span className="text-sm font-medium">選択肢:</span>
+                                                <span className="text-sm font-medium">選択肢の管理:</span>
                                                 <button
                                                     onClick={() => handleAddOption(field.id)}
-                                                    className="text-blue-500 hover:text-blue-700 text-sm"
+                                                    className="text-blue-500 hover:text-blue-700 text-sm bg-blue-50 px-2 py-1 rounded border border-blue-200 hover:bg-blue-100"
                                                 >
-                                                    + 追加
+                                                    + 選択肢を追加
                                                 </button>
                                             </div>
-                                            <div className="flex flex-wrap gap-1">
+                                            {(field.options || []).length === 0 && (
+                                                <p className="text-xs text-gray-500 mb-2">まだ選択肢がありません。上のボタンから追加してください。</p>
+                                            )}
+                                            <div className="flex flex-wrap gap-2">
                                                 {(field.options || []).map((option, index) => (
                                                     <span
                                                         key={index}
-                                                        className="bg-gray-100 px-2 py-1 rounded text-sm cursor-pointer hover:bg-gray-200"
+                                                        className="bg-gray-100 px-2 py-1 rounded text-sm cursor-pointer hover:bg-red-100 border"
                                                         onClick={() => {
-                                                            if (confirm(`"${option}" を削除しますか？`)) {
+                                                            if (confirm(`選択肢「${option}」を削除しますか？`)) {
                                                                 const newOptions = field.options.filter((_, i) => i !== index);
                                                                 handleFieldUpdate(field.id, { options: newOptions });
                                                             }
                                                         }}
+                                                        title="クリックで削除"
                                                     >
                                                         {option} ×
                                                     </span>
@@ -319,21 +341,21 @@
                             ))}
                         </div>
 
-                        <div className="border-t pt-4 mb-6">
-                            <h4 className="font-medium mb-3">新しいフィールドを追加</h4>
-                            <div className="space-y-2">
+                        <div className="border-t pt-4 mb-6 bg-blue-50 p-4 rounded-lg">
+                            <h4 className="font-medium mb-3 text-blue-800">🆕 新しいフィールドを追加</h4>
+                            <div className="space-y-3">
                                 <div className="flex space-x-2">
                                     <input
                                         type="text"
-                                        placeholder="フィールド名"
+                                        placeholder="フィールド名（例：連絡先、経験年数、希望年収）"
                                         value={newField.name}
                                         onChange={(e) => setNewField(prev => ({ ...prev, name: e.target.value }))}
-                                        className="flex-1 border rounded px-3 py-2"
+                                        className="flex-1 border rounded px-3 py-2 bg-white"
                                     />
                                     <select
                                         value={newField.type}
                                         onChange={(e) => setNewField(prev => ({ ...prev, type: e.target.value }))}
-                                        className="border rounded px-3 py-2"
+                                        className="border rounded px-3 py-2 bg-white"
                                     >
                                         {FIELD_TYPES.map(type => (
                                             <option key={type.value} value={type.value}>
@@ -341,20 +363,24 @@
                                             </option>
                                         ))}
                                     </select>
-                                    <label className="flex items-center space-x-1">
+                                    <label className="flex items-center space-x-1 bg-white px-3 py-2 rounded border">
                                         <input
                                             type="checkbox"
                                             checked={newField.required}
                                             onChange={(e) => setNewField(prev => ({ ...prev, required: e.target.checked }))}
                                         />
-                                        <span className="text-sm">必須</span>
+                                        <span className="text-sm">必須項目</span>
                                     </label>
                                     <button
                                         onClick={handleAddField}
-                                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                                        disabled={!newField.name.trim()}
+                                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-4 py-2 rounded font-medium"
                                     >
-                                        追加
+                                        フィールド追加
                                     </button>
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                    💡 ヒント: 「選択肢」タイプを選んだ場合は、追加後に選択肢の設定ができます
                                 </div>
                             </div>
                         </div>
@@ -1134,7 +1160,7 @@
             return (
                 <div className="p-6 bg-gray-100 min-h-screen">
                     <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（カスタムフィールド版）</h1>
+                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（社内共有版）</h1>
                         <button
                             onClick={() => setShowAddPosition(true)}
                             className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -1325,7 +1351,7 @@
                 <div className="min-h-screen flex items-center justify-center bg-gray-100">
                     <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
                         <h2 className="text-2xl font-bold mb-6 text-center">サロウィン社内専用</h2>
-                        <p className="text-gray-600 mb-4 text-center">採用管理システム（カスタムフィールド版）<br/>パスワードを入力してください</p>
+                        <p className="text-gray-600 mb-4 text-center">採用管理システム（社内共有版）<br/>パスワードを入力してください</p>
                         <form onSubmit={handleSubmit}>
                             <input
                                 type="password"
@@ -1343,6 +1369,7 @@
                             </button>
                         </form>
                         <div className="mt-4 text-xs text-gray-500 text-center">
+                            社内チーム全体でデータを共有します<br/>
                             カスタムフィールド機能付き
                         </div>
                     </div>
