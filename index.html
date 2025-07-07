@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>採用管理システム（チーム共有版）</title>
+    <title>採用管理システム（カスタムフィールド版）</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -22,6 +22,7 @@
 </head>
 <body>
     <div id="root"></div>
+    
     <script type="text/babel">
         const { useState, useCallback, useEffect } = React;
 
@@ -70,38 +71,23 @@
             </svg>
         );
 
-        const ArrowLeft = () => (
+        const Settings = () => (
             <svg className="lucide" viewBox="0 0 24 24">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
         );
 
-        const RotateCcw = () => (
-            <svg className="lucide" viewBox="0 0 24 24">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                <path d="M3 3v5h5"/>
-            </svg>
-        );
-
-        const Wifi = () => (
-            <svg className="lucide" viewBox="0 0 24 24">
-                <path d="m1 9 4-4 4 4"/>
-                <path d="m1 9 4-4 4 4"/>
-                <circle cx="12" cy="19" r="1"/>
-                <path d="M5 12.859a10 10 0 0 1 14 0"/>
-                <path d="M8.5 16.429a5 5 0 0 1 7 0"/>
-            </svg>
-        );
-
-        const WifiOff = () => (
-            <svg className="lucide" viewBox="0 0 24 24">
-                <path d="m12 20 3-3 3 3-3 3-3-3z"/>
-                <path d="M8.5 16.429a5 5 0 0 1 7 0"/>
-                <path d="M5 12.859a10 10 0 0 1 5.17-2.69"/>
-                <path d="m2 2 20 20"/>
-                <path d="M16.83 10.17a10 10 0 0 1 2.17 2.69"/>
-            </svg>
-        );
+        // フィールドタイプの定数
+        const FIELD_TYPES = [
+            { value: 'text', label: 'テキスト' },
+            { value: 'number', label: '数値' },
+            { value: 'date', label: '日付' },
+            { value: 'select', label: '選択肢' },
+            { value: 'email', label: 'メール' },
+            { value: 'tel', label: '電話番号' },
+            { value: 'textarea', label: '長文テキスト' }
+        ];
 
         // 採用者属性の定数
         const HIRING_ATTRIBUTES = [
@@ -124,350 +110,268 @@
           { id: 'rejected', name: '不合格', color: 'bg-red-500' }
         ];
 
-        // ナビゲーション履歴管理
-        class NavigationHistory {
-            constructor() {
-                this.history = this.loadHistory();
-            }
+        // カスタムフィールド入力コンポーネント
+        const CustomFieldInput = ({ field, value, onChange }) => {
+            const handleChange = (newValue) => {
+                onChange(field.id, newValue);
+            };
 
-            loadHistory() {
-                try {
-                    const saved = localStorage.getItem('navigation-history');
-                    return saved ? JSON.parse(saved) : [];
-                } catch {
-                    return [];
+            switch (field.type) {
+                case 'text':
+                case 'email':
+                case 'tel':
+                    return (
+                        <input
+                            type={field.type}
+                            value={value || ''}
+                            onChange={(e) => handleChange(e.target.value)}
+                            className="w-full border rounded px-2 py-1 text-sm"
+                            placeholder={field.name}
+                            required={field.required}
+                        />
+                    );
+                case 'number':
+                    return (
+                        <input
+                            type="number"
+                            value={value || ''}
+                            onChange={(e) => handleChange(e.target.value)}
+                            className="w-full border rounded px-2 py-1 text-sm"
+                            placeholder={field.name}
+                            required={field.required}
+                        />
+                    );
+                case 'date':
+                    return (
+                        <input
+                            type="date"
+                            value={value || ''}
+                            onChange={(e) => handleChange(e.target.value)}
+                            className="w-full border rounded px-2 py-1 text-sm"
+                            required={field.required}
+                        />
+                    );
+                case 'select':
+                    return (
+                        <select
+                            value={value || ''}
+                            onChange={(e) => handleChange(e.target.value)}
+                            className="w-full border rounded px-2 py-1 text-sm"
+                            required={field.required}
+                        >
+                            <option value="">{field.name}を選択</option>
+                            {(field.options || []).map((option, index) => (
+                                <option key={index} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                    );
+                case 'textarea':
+                    return (
+                        <textarea
+                            value={value || ''}
+                            onChange={(e) => handleChange(e.target.value)}
+                            className="w-full border rounded px-2 py-1 text-sm h-20 resize-none"
+                            placeholder={field.name}
+                            required={field.required}
+                        />
+                    );
+                default:
+                    return null;
+            }
+        };
+
+        // カスタムフィールド設定モーダル
+        const CustomFieldsModal = ({ isOpen, position, onUpdatePosition, onClose }) => {
+            const [editingFields, setEditingFields] = useState([]);
+            const [newField, setNewField] = useState({ 
+                name: '', 
+                type: 'text', 
+                required: false, 
+                options: [] 
+            });
+
+            useEffect(() => {
+                if (position) {
+                    setEditingFields([...(position.customFields || [])]);
                 }
-            }
+            }, [position]);
 
-            saveHistory() {
-                try {
-                    localStorage.setItem('navigation-history', JSON.stringify(this.history));
-                } catch (error) {
-                    console.error('Failed to save navigation history:', error);
-                }
-            }
+            if (!isOpen || !position) return null;
 
-            push(route) {
-                // 重複を避けるため、同じルートは削除してから追加
-                this.history = this.history.filter(item => 
-                    !(item.type === route.type && item.id === route.id)
+            const handleFieldUpdate = (fieldId, updates) => {
+                setEditingFields(prev => 
+                    prev.map(field => field.id === fieldId ? { ...field, ...updates } : field)
                 );
-                this.history.push({
-                    ...route,
-                    timestamp: Date.now()
-                });
+            };
+
+            const handleAddField = () => {
+                if (!newField.name.trim()) return;
                 
-                // 履歴を最大10件に制限
-                if (this.history.length > 10) {
-                    this.history = this.history.slice(-10);
-                }
-                
-                this.saveHistory();
-            }
-
-            pop() {
-                if (this.history.length > 0) {
-                    const lastRoute = this.history.pop();
-                    this.saveHistory();
-                    return lastRoute;
-                }
-                return null;
-            }
-
-            getCurrentRoute() {
-                return this.history.length > 0 ? this.history[this.history.length - 1] : null;
-            }
-
-            clear() {
-                this.history = [];
-                this.saveHistory();
-            }
-        }
-
-        // データベース操作クラス
-        class DatabaseManager {
-            constructor() {
-                this.isOnline = navigator.onLine;
-                this.setupOnlineListener();
-            }
-
-            setupOnlineListener() {
-                window.addEventListener('online', () => {
-                    this.isOnline = true;
-                    this.syncLocalToRemote();
-                });
-                window.addEventListener('offline', () => {
-                    this.isOnline = false;
-                });
-            }
-
-            async saveData(data) {
-                try {
-                    // 常にローカルストレージにバックアップ保存
-                    localStorage.setItem('recruitmentPositions', JSON.stringify(data));
-                    localStorage.setItem('lastLocalUpdate', new Date().toISOString());
-
-                    // オンラインの場合は共有データベースにも保存
-                    if (this.isOnline) {
-                        const response = await fetch('/api/positions', {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer sarowin-team'
-                            },
-                            body: JSON.stringify({
-                                data: data,
-                                timestamp: new Date().toISOString(),
-                                userId: this.getUserId()
-                            })
-                        });
-
-                        if (response.ok) {
-                            localStorage.setItem('lastSuccessfulSync', new Date().toISOString());
-                            return { success: true, source: 'remote' };
-                        } else {
-                            throw new Error('Remote save failed');
-                        }
-                    } else {
-                        // オフラインの場合は待機中としてマーク
-                        localStorage.setItem('pendingSync', 'true');
-                        return { success: true, source: 'local' };
-                    }
-                } catch (error) {
-                    console.error('Save failed:', error);
-                    // リモート保存に失敗してもローカルには保存されている
-                    localStorage.setItem('pendingSync', 'true');
-                    return { success: true, source: 'local', error: error.message };
-                }
-            }
-
-            async loadData() {
-                try {
-                    if (this.isOnline) {
-                        // オンラインの場合は最新データを取得
-                        const response = await fetch('/api/positions', {
-                            headers: { 'Authorization': 'Bearer sarowin-team' }
-                        });
-
-                        if (response.ok) {
-                            const result = await response.json();
-                            if (result.data && Array.isArray(result.data)) {
-                                // リモートデータをローカルにも保存
-                                localStorage.setItem('recruitmentPositions', JSON.stringify(result.data));
-                                localStorage.setItem('lastSuccessfulSync', new Date().toISOString());
-                                return { data: result.data, source: 'remote', timestamp: result.timestamp };
-                            }
-                        }
-                    }
-
-                    // オフラインまたはリモート取得失敗時はローカルデータを使用
-                    const localData = localStorage.getItem('recruitmentPositions');
-                    if (localData) {
-                        const data = JSON.parse(localData);
-                        return { 
-                            data: data, 
-                            source: 'local',
-                            timestamp: localStorage.getItem('lastLocalUpdate')
-                        };
-                    }
-
-                    // 初回起動時のデフォルトデータ
-                    return { data: this.getDefaultData(), source: 'default' };
-
-                } catch (error) {
-                    console.error('Load failed:', error);
-                    // エラー時はローカルデータまたはデフォルトデータを返す
-                    const localData = localStorage.getItem('recruitmentPositions');
-                    if (localData) {
-                        try {
-                            return { data: JSON.parse(localData), source: 'local' };
-                        } catch {
-                            return { data: this.getDefaultData(), source: 'default' };
-                        }
-                    }
-                    return { data: this.getDefaultData(), source: 'default' };
-                }
-            }
-
-            async syncLocalToRemote() {
-                const pendingSync = localStorage.getItem('pendingSync');
-                if (pendingSync === 'true' && this.isOnline) {
-                    const localData = localStorage.getItem('recruitmentPositions');
-                    if (localData) {
-                        try {
-                            const data = JSON.parse(localData);
-                            await this.saveData(data);
-                            localStorage.removeItem('pendingSync');
-                        } catch (error) {
-                            console.error('Sync failed:', error);
-                        }
-                    }
-                }
-            }
-
-            getUserId() {
-                let userId = localStorage.getItem('userId');
-                if (!userId) {
-                    userId = 'user_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('userId', userId);
-                }
-                return userId;
-            }
-
-            getDefaultData() {
-                return [
-                    { 
-                      id: 1, 
-                      name: 'ネイル本部人員（セールス＆CS）',
-                      department: 'リテール事業部',
-                      hiringManager: '田中マネージャー',
-                      hiringAttribute: 'experienced',
-                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] }))
-                    },
-                    { 
-                      id: 2, 
-                      name: 'アイリスト本部人員（セールス＆CS）',
-                      department: 'リテール事業部',
-                      hiringManager: '山田部長',
-                      hiringAttribute: 'potential',
-                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] }))
-                    }
-                ];
-            }
-
-            getConnectionStatus() {
-                const lastSync = localStorage.getItem('lastSuccessfulSync');
-                const pendingSync = localStorage.getItem('pendingSync') === 'true';
-                
-                return {
-                    isOnline: this.isOnline,
-                    lastSync: lastSync ? new Date(lastSync) : null,
-                    pendingSync: pendingSync
+                const field = {
+                    id: `field_${Date.now()}`,
+                    name: newField.name.trim(),
+                    type: newField.type,
+                    required: newField.required,
+                    options: newField.options
                 };
-            }
-        }
-
-        // 戻るボタンコンポーネント
-        const BackButton = ({ navigationHistory, onBack }) => {
-            const [canGoBack, setCanGoBack] = useState(false);
-            const [lastRoute, setLastRoute] = useState(null);
-
-            useEffect(() => {
-                const currentRoute = navigationHistory.getCurrentRoute();
-                const hasHistory = navigationHistory.history.length > 1;
                 
-                setCanGoBack(hasHistory);
-                if (hasHistory && navigationHistory.history.length >= 2) {
-                    setLastRoute(navigationHistory.history[navigationHistory.history.length - 2]);
-                }
-            }, [navigationHistory]);
+                setEditingFields(prev => [...prev, field]);
+                setNewField({ name: '', type: 'text', required: false, options: [] });
+            };
 
-            if (!canGoBack) return null;
-
-            const getBackButtonText = () => {
-                if (!lastRoute) return '前の画面に戻る';
-                
-                switch (lastRoute.type) {
-                    case 'position-list':
-                        return 'ポジション一覧に戻る';
-                    case 'position-detail':
-                        return `${lastRoute.name || '詳細画面'}に戻る`;
-                    default:
-                        return '前の画面に戻る';
+            const handleDeleteField = (fieldId) => {
+                if (confirm('このフィールドを削除しますか？')) {
+                    setEditingFields(prev => prev.filter(field => field.id !== fieldId));
                 }
+            };
+
+            const handleAddOption = (fieldId) => {
+                const option = prompt('選択肢を入力してください:');
+                if (option) {
+                    handleFieldUpdate(fieldId, {
+                        options: [...(editingFields.find(f => f.id === fieldId)?.options || []), option]
+                    });
+                }
+            };
+
+            const handleSave = () => {
+                onUpdatePosition(position.id, {
+                    ...position,
+                    customFields: editingFields
+                });
+                onClose();
             };
 
             return (
-                <button
-                    onClick={onBack}
-                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 transition-colors"
-                >
-                    <RotateCcw />
-                    <span className="text-sm">{getBackButtonText()}</span>
-                </button>
-            );
-        };
-
-        // 接続ステータス表示コンポーネント
-        const ConnectionStatus = ({ dbManager, dataSource, lastUpdate }) => {
-            const [status, setStatus] = useState(dbManager.getConnectionStatus());
-
-            useEffect(() => {
-                const updateStatus = () => setStatus(dbManager.getConnectionStatus());
-                
-                window.addEventListener('online', updateStatus);
-                window.addEventListener('offline', updateStatus);
-                
-                return () => {
-                    window.removeEventListener('online', updateStatus);
-                    window.removeEventListener('offline', updateStatus);
-                };
-            }, [dbManager]);
-
-            const getStatusColor = () => {
-                if (!status.isOnline) return 'bg-red-100 text-red-800';
-                if (status.pendingSync) return 'bg-yellow-100 text-yellow-800';
-                return 'bg-green-100 text-green-800';
-            };
-
-            const getStatusText = () => {
-                if (!status.isOnline) return 'オフライン（ローカル保存のみ）';
-                if (status.pendingSync) return 'オンライン（同期待ち）';
-                return 'オンライン（同期済み）';
-            };
-
-            return (
-                <div className="fixed bottom-4 left-4 z-50">
-                    <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm ${getStatusColor()}`}>
-                        {status.isOnline ? <Wifi /> : <WifiOff />}
-                        <span>{getStatusText()}</span>
-                    </div>
-                    {dataSource && (
-                        <div className="text-xs text-gray-500 mt-1 px-3">
-                            データ: {dataSource === 'remote' ? 'チーム共有' : dataSource === 'local' ? 'ローカル' : '初期設定'}
-                            {lastUpdate && ` (${new Date(lastUpdate).toLocaleString()})`}
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+                        <h3 className="text-lg font-semibold mb-4">カスタムフィールド設定 - {position.name}</h3>
+                        
+                        <div className="space-y-3 mb-6">
+                            {editingFields.map((field) => (
+                                <div key={field.id} className="border rounded-lg p-3">
+                                    <div className="flex items-center space-x-3 mb-2">
+                                        <input
+                                            type="text"
+                                            value={field.name}
+                                            onChange={(e) => handleFieldUpdate(field.id, { name: e.target.value })}
+                                            className="flex-1 border rounded px-2 py-1 font-medium"
+                                        />
+                                        <select
+                                            value={field.type}
+                                            onChange={(e) => handleFieldUpdate(field.id, { type: e.target.value })}
+                                            className="border rounded px-2 py-1"
+                                        >
+                                            {FIELD_TYPES.map(type => (
+                                                <option key={type.value} value={type.value}>
+                                                    {type.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <label className="flex items-center space-x-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={field.required}
+                                                onChange={(e) => handleFieldUpdate(field.id, { required: e.target.checked })}
+                                            />
+                                            <span className="text-sm">必須</span>
+                                        </label>
+                                        <button
+                                            onClick={() => handleDeleteField(field.id)}
+                                            className="text-red-500 hover:text-red-700 p-1"
+                                        >
+                                            <Trash2 />
+                                        </button>
+                                    </div>
+                                    
+                                    {field.type === 'select' && (
+                                        <div className="ml-4">
+                                            <div className="flex items-center space-x-2 mb-2">
+                                                <span className="text-sm font-medium">選択肢:</span>
+                                                <button
+                                                    onClick={() => handleAddOption(field.id)}
+                                                    className="text-blue-500 hover:text-blue-700 text-sm"
+                                                >
+                                                    + 追加
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {(field.options || []).map((option, index) => (
+                                                    <span
+                                                        key={index}
+                                                        className="bg-gray-100 px-2 py-1 rounded text-sm cursor-pointer hover:bg-gray-200"
+                                                        onClick={() => {
+                                                            if (confirm(`"${option}" を削除しますか？`)) {
+                                                                const newOptions = field.options.filter((_, i) => i !== index);
+                                                                handleFieldUpdate(field.id, { options: newOptions });
+                                                            }
+                                                        }}
+                                                    >
+                                                        {option} ×
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
-                    )}
-                </div>
-            );
-        };
 
-        // ログインコンポーネント
-        const LoginComponent = ({ onLogin }) => {
-            const [password, setPassword] = useState('');
-            
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (password === 'salowin2025') {
-                    onLogin();
-                } else {
-                    alert('パスワードが正しくありません');
-                }
-            };
+                        <div className="border-t pt-4 mb-6">
+                            <h4 className="font-medium mb-3">新しいフィールドを追加</h4>
+                            <div className="space-y-2">
+                                <div className="flex space-x-2">
+                                    <input
+                                        type="text"
+                                        placeholder="フィールド名"
+                                        value={newField.name}
+                                        onChange={(e) => setNewField(prev => ({ ...prev, name: e.target.value }))}
+                                        className="flex-1 border rounded px-3 py-2"
+                                    />
+                                    <select
+                                        value={newField.type}
+                                        onChange={(e) => setNewField(prev => ({ ...prev, type: e.target.value }))}
+                                        className="border rounded px-3 py-2"
+                                    >
+                                        {FIELD_TYPES.map(type => (
+                                            <option key={type.value} value={type.value}>
+                                                {type.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <label className="flex items-center space-x-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={newField.required}
+                                            onChange={(e) => setNewField(prev => ({ ...prev, required: e.target.checked }))}
+                                        />
+                                        <span className="text-sm">必須</span>
+                                    </label>
+                                    <button
+                                        onClick={handleAddField}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                                    >
+                                        追加
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-            return (
-                <div className="min-h-screen flex items-center justify-center bg-gray-100">
-                    <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-                        <h2 className="text-2xl font-bold mb-6 text-center">サロウィン社内専用</h2>
-                        <p className="text-gray-600 mb-4 text-center">採用管理システム（チーム共有版）<br/>パスワードを入力してください</p>
-                        <form onSubmit={handleSubmit}>
-                            <input
-                                type="password"
-                                placeholder="パスワードを入力"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full border rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            />
-                            <button 
-                                type="submit"
-                                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-medium"
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg"
                             >
-                                ログイン
+                                キャンセル
                             </button>
-                        </form>
-                        <div className="mt-4 text-xs text-gray-500 text-center">
-                            チーム全体でデータを共有します
+                            <button
+                                onClick={handleSave}
+                                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                            >
+                                保存
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -479,24 +383,37 @@
           isOpen, 
           candidate, 
           phaseId, 
+          position,
           onUpdate, 
           onClose 
         }) => {
           const [editData, setEditData] = useState({
             name: candidate?.name || '',
-            notes: candidate?.notes || ''
+            notes: candidate?.notes || '',
+            customFields: candidate?.customFields || {}
           });
 
-          React.useEffect(() => {
+          useEffect(() => {
             if (candidate) {
               setEditData({
                 name: candidate.name || '',
-                notes: candidate.notes || ''
+                notes: candidate.notes || '',
+                customFields: candidate.customFields || {}
               });
             }
           }, [candidate]);
 
           if (!isOpen || !candidate) return null;
+
+          const handleCustomFieldChange = (fieldId, value) => {
+            setEditData(prev => ({
+              ...prev,
+              customFields: {
+                ...prev.customFields,
+                [fieldId]: value
+              }
+            }));
+          };
 
           const handleSave = () => {
             onUpdate(phaseId, candidate.id, editData);
@@ -510,15 +427,32 @@
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      候補者名
+                      候補者名 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={editData.name}
                       onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2"
+                      required
                     />
                   </div>
+
+                  {/* カスタムフィールド */}
+                  {position?.customFields?.map((field) => (
+                    <div key={field.id}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {field.name}
+                        {field.required && <span className="text-red-500"> *</span>}
+                      </label>
+                      <CustomFieldInput
+                        field={field}
+                        value={editData.customFields[field.id]}
+                        onChange={handleCustomFieldChange}
+                      />
+                    </div>
+                  ))}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       メモ・詳細情報
@@ -557,6 +491,7 @@
         const CandidateCard = ({ 
           candidate, 
           phaseId, 
+          position,
           onUpdateCandidate,
           onMoveCandidate,
           onDeleteCandidate,
@@ -567,6 +502,22 @@
           const [showMenu, setShowMenu] = useState(false);
           const [isEditing, setIsEditing] = useState(false);
           const isSelected = selectedCandidate?.id === candidate.id;
+
+          // カスタムフィールドの表示用データを取得
+          const getDisplayCustomFields = () => {
+            if (!position?.customFields || !candidate.customFields) return [];
+            
+            return position.customFields
+              .filter(field => candidate.customFields[field.id])
+              .slice(0, 2) // 最大2つまで表示
+              .map(field => ({
+                name: field.name,
+                value: candidate.customFields[field.id],
+                type: field.type
+              }));
+          };
+
+          const displayFields = getDisplayCustomFields();
 
           return (
             <div 
@@ -674,6 +625,18 @@
                   </div>
                 </div>
               </div>
+
+              {/* カスタムフィールド表示 */}
+              {displayFields.length > 0 && (
+                <div className="text-xs text-gray-600 mb-2 space-y-1">
+                  {displayFields.map((field, index) => (
+                    <div key={index} className="flex items-center space-x-1">
+                      <span className="font-medium">{field.name}:</span>
+                      <span>{field.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {candidate.notes && (
                 <div className="text-xs text-gray-600 mb-2 bg-gray-50 p-2 rounded max-h-16 overflow-y-auto">
@@ -817,16 +780,13 @@
 
         // 採用管理システム
         const RecruitmentSystem = () => {
-            const [dbManager] = useState(() => new DatabaseManager());
-            const [navigationHistory] = useState(() => new NavigationHistory());
             const [positions, setPositions] = useState([]);
-            const [dataSource, setDataSource] = useState(null);
-            const [lastUpdate, setLastUpdate] = useState(null);
             const [selectedPosition, setSelectedPosition] = useState(null);
             const [selectedCandidate, setSelectedCandidate] = useState(null);
             const [newTaskInputs, setNewTaskInputs] = useState({});
             const [editingPosition, setEditingPosition] = useState(null);
             const [showAddPosition, setShowAddPosition] = useState(false);
+            const [showCustomFields, setShowCustomFields] = useState(false);
             const [newPosition, setNewPosition] = useState({
                 name: '',
                 department: '',
@@ -840,91 +800,35 @@
 
             // 初期データ読み込み
             useEffect(() => {
-                const loadInitialData = async () => {
-                    const result = await dbManager.loadData();
-                    setPositions(result.data);
-                    setDataSource(result.source);
-                    setLastUpdate(result.timestamp);
-                };
-                loadInitialData();
-            }, [dbManager]);
-
-            // データを保存
-            const saveData = useCallback(async (data) => {
-                const result = await dbManager.saveData(data);
-                if (result.success) {
-                    setLastUpdate(new Date().toISOString());
-                    if (result.error) {
-                        // リモート保存失敗の場合は警告表示（オプション）
-                        console.warn('Remote save failed, saved locally:', result.error);
+                const defaultData = [
+                    { 
+                      id: 1, 
+                      name: 'ネイル本部人員（セールス＆CS）',
+                      department: 'リテール事業部',
+                      hiringManager: '田中マネージャー',
+                      hiringAttribute: 'experienced',
+                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
+                      customFields: [
+                        { id: 'contact', name: '連絡先', type: 'email', required: true },
+                        { id: 'experience', name: '経験年数', type: 'number', required: false },
+                        { id: 'salary', name: '希望年収', type: 'number', required: false }
+                      ]
+                    },
+                    { 
+                      id: 2, 
+                      name: 'アイリスト本部人員（セールス＆CS）',
+                      department: 'リテール事業部',
+                      hiringManager: '山田部長',
+                      hiringAttribute: 'potential',
+                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
+                      customFields: [
+                        { id: 'contact', name: '連絡先', type: 'email', required: true },
+                        { id: 'experience', name: '経験年数', type: 'number', required: false }
+                      ]
                     }
-                }
-            }, [dbManager]);
-
-            // 定期的にリモートデータをチェック（オプション）
-            useEffect(() => {
-                const interval = setInterval(async () => {
-                    if (navigator.onLine) {
-                        try {
-                            const result = await dbManager.loadData();
-                            if (result.source === 'remote' && result.timestamp !== lastUpdate) {
-                                setPositions(result.data);
-                                setLastUpdate(result.timestamp);
-                            }
-                        } catch (error) {
-                            console.log('Periodic sync failed:', error);
-                        }
-                    }
-                }, 30000); // 30秒ごと
-
-                return () => clearInterval(interval);
-            }, [dbManager, lastUpdate]);
-
-            // ナビゲーション管理
-            const handlePositionSelect = useCallback((position) => {
-                // 現在の一覧状態を履歴に保存
-                navigationHistory.push({
-                    type: 'position-list',
-                    name: 'ポジション一覧'
-                });
-                
-                // 選択されたポジションの詳細を履歴に保存
-                navigationHistory.push({
-                    type: 'position-detail',
-                    id: position.id,
-                    name: position.name
-                });
-                
-                setSelectedPosition(position);
-                setSelectedCandidate(null);
-            }, [navigationHistory]);
-
-            const handleBackNavigation = useCallback(() => {
-                const lastRoute = navigationHistory.pop(); // 現在のルートを削除
-                const previousRoute = navigationHistory.getCurrentRoute(); // 前のルートを取得
-                
-                if (previousRoute) {
-                    if (previousRoute.type === 'position-list') {
-                        setSelectedPosition(null);
-                        setSelectedCandidate(null);
-                    } else if (previousRoute.type === 'position-detail') {
-                        // 特定のポジション詳細に戻る場合
-                        const position = positions.find(p => p.id === previousRoute.id);
-                        if (position) {
-                            setSelectedPosition(position);
-                            setSelectedCandidate(null);
-                        } else {
-                            // ポジションが見つからない場合は一覧に戻る
-                            setSelectedPosition(null);
-                            setSelectedCandidate(null);
-                        }
-                    }
-                } else {
-                    // 履歴がない場合は一覧に戻る
-                    setSelectedPosition(null);
-                    setSelectedCandidate(null);
-                }
-            }, [navigationHistory, positions]);
+                ];
+                setPositions(defaultData);
+            }, []);
 
             // 候補者選択
             const handleCandidateClick = useCallback((candidate) => {
@@ -949,6 +853,7 @@
                     id: `pos${selectedPosition.id}-${phaseId}-${Date.now()}`,
                     name: candidateName.trim(),
                     notes: '',
+                    customFields: {},
                     createdAt: new Date().toISOString()
                 };
 
@@ -969,8 +874,7 @@
                 });
 
                 setPositions(updatedPositions);
-                saveData(updatedPositions);
-            }, [selectedPosition, positions, saveData]);
+            }, [selectedPosition, positions]);
 
             // 候補者を更新
             const updateCandidate = useCallback((phaseId, candidateId, updates) => {
@@ -998,8 +902,7 @@
                 });
 
                 setPositions(updatedPositions);
-                saveData(updatedPositions);
-            }, [selectedPosition, positions, saveData]);
+            }, [selectedPosition, positions]);
 
             // 候補者を移動
             const moveCandidate = useCallback((candidateId, fromPhaseId, toPhaseId) => {
@@ -1029,8 +932,7 @@
                 });
 
                 setPositions(updatedPositions);
-                saveData(updatedPositions);
-            }, [selectedPosition, positions, saveData]);
+            }, [selectedPosition, positions]);
 
             // 候補者を削除
             const deleteCandidate = useCallback((phaseId, candidateId) => {
@@ -1051,9 +953,8 @@
                 });
 
                 setPositions(updatedPositions);
-                saveData(updatedPositions);
                 setSelectedCandidate(null);
-            }, [selectedPosition, positions, saveData]);
+            }, [selectedPosition, positions]);
 
             // ポジションを追加
             const addPosition = useCallback(() => {
@@ -1065,64 +966,44 @@
                     department: newPosition.department.trim(),
                     hiringManager: newPosition.hiringManager.trim(),
                     hiringAttribute: newPosition.hiringAttribute,
-                    phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] }))
+                    phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
+                    customFields: [
+                        { id: 'contact', name: '連絡先', type: 'email', required: true },
+                        { id: 'experience', name: '経験年数', type: 'number', required: false }
+                    ]
                 };
 
                 const updatedPositions = [...positions, position];
                 setPositions(updatedPositions);
-                saveData(updatedPositions);
                 setNewPosition({ name: '', department: '', hiringManager: '', hiringAttribute: 'none' });
                 setShowAddPosition(false);
-            }, [newPosition, positions, saveData]);
+            }, [newPosition, positions]);
 
             // ポジションを更新
             const updatePosition = useCallback((positionId, updates) => {
                 const updatedPositions = positions.map(pos => 
-                    pos.id === positionId ? { ...pos, ...updates } : pos
+                    pos.id === positionId ? updates : pos
                 );
                 setPositions(updatedPositions);
-                saveData(updatedPositions);
                 
                 if (selectedPosition?.id === positionId) {
-                    setSelectedPosition(prev => ({ ...prev, ...updates }));
+                    setSelectedPosition(updates);
                 }
-            }, [positions, selectedPosition, saveData]);
+            }, [positions, selectedPosition]);
 
             // ポジションを削除
             const deletePosition = useCallback((positionId) => {
                 const updatedPositions = positions.filter(pos => pos.id !== positionId);
                 setPositions(updatedPositions);
-                saveData(updatedPositions);
                 
                 if (selectedPosition?.id === positionId) {
                     setSelectedPosition(null);
                 }
-            }, [positions, selectedPosition, saveData]);
+            }, [positions, selectedPosition]);
 
             const getPositionStats = (position) => {
                 const totalCandidates = position.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
-                const applicationCount = position.phases.find(p => p.id === 'application')?.candidates.length || 0;
-                const screeningCount = position.phases.find(p => p.id === 'screening')?.candidates.length || 0;
-                const interview1Count = position.phases.find(p => p.id === 'interview1')?.candidates.length || 0;
-                const interview2Count = position.phases.find(p => p.id === 'interview2')?.candidates.length || 0;
-                const finalCount = position.phases.find(p => p.id === 'final')?.candidates.length || 0;
-                const offerCount = position.phases.find(p => p.id === 'offer')?.candidates.length || 0;
-                const hiredCount = position.phases.find(p => p.id === 'hired')?.candidates.length || 0;
-                const declinedCount = position.phases.find(p => p.id === 'declined')?.candidates.length || 0;
-                const rejectedCount = position.phases.find(p => p.id === 'rejected')?.candidates.length || 0;
-                
-                return { 
-                  totalCandidates, 
-                  applicationCount,
-                  screeningCount,
-                  interview1Count,
-                  interview2Count,
-                  finalCount,
-                  offerCount,
-                  hiredCount, 
-                  declinedCount, 
-                  rejectedCount 
-                };
+                return { totalCandidates };
             };
 
             // カンバンボード表示
@@ -1131,18 +1012,25 @@
 
                 return (
                     <div className="p-6 bg-gray-100 min-h-screen">
-                        <ConnectionStatus 
-                            dbManager={dbManager} 
-                            dataSource={dataSource} 
-                            lastUpdate={lastUpdate} 
-                        />
-                        
                         <div className="mb-6">
-                            <BackButton 
-                                navigationHistory={navigationHistory}
-                                onBack={handleBackNavigation}
-                            />
-                            <div className="mt-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <button
+                                    onClick={() => setSelectedPosition(null)}
+                                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 transition-colors"
+                                >
+                                    <span className="text-sm">← ポジション一覧に戻る</span>
+                                </button>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => setShowCustomFields(true)}
+                                        className="flex items-center space-x-2 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm"
+                                    >
+                                        <Settings />
+                                        <span>カスタムフィールド設定</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
                                 <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
                                 <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
                             </div>
@@ -1183,6 +1071,7 @@
                                                 key={candidate.id}
                                                 candidate={candidate}
                                                 phaseId={phase.id}
+                                                position={selectedPosition}
                                                 selectedCandidate={selectedCandidate}
                                                 onCandidateClick={handleCandidateClick}
                                                 onOpenDetail={openCandidateDetail}
@@ -1218,10 +1107,18 @@
                             ))}
                         </div>
 
+                        <CustomFieldsModal
+                            isOpen={showCustomFields}
+                            position={selectedPosition}
+                            onUpdatePosition={updatePosition}
+                            onClose={() => setShowCustomFields(false)}
+                        />
+
                         <CandidateDetailModal
                             isOpen={detailModalOpen}
                             candidate={detailEditingCandidate}
                             phaseId={detailEditingPhase}
+                            position={selectedPosition}
                             onUpdate={updateCandidate}
                             onClose={() => {
                                 setDetailModalOpen(false);
@@ -1236,20 +1133,8 @@
             // メイン画面表示
             return (
                 <div className="p-6 bg-gray-100 min-h-screen">
-                    <ConnectionStatus 
-                        dbManager={dbManager} 
-                        dataSource={dataSource} 
-                        lastUpdate={lastUpdate} 
-                    />
-                    
                     <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center space-x-4">
-                            <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（チーム共有版）</h1>
-                            <BackButton 
-                                navigationHistory={navigationHistory}
-                                onBack={handleBackNavigation}
-                            />
-                        </div>
+                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（カスタムフィールド版）</h1>
                         <button
                             onClick={() => setShowAddPosition(true)}
                             className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -1266,7 +1151,18 @@
                             
                             return (
                                 <div key={position.id} className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow relative">
-                                    <div className="absolute top-4 right-4">
+                                    <div className="absolute top-4 right-4 flex items-center space-x-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedPosition(position);
+                                                setShowCustomFields(true);
+                                            }}
+                                            className="text-gray-400 hover:text-indigo-600 p-1"
+                                            title="カスタムフィールド設定"
+                                        >
+                                            <Settings />
+                                        </button>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -1280,7 +1176,7 @@
 
                                     <div 
                                         className="cursor-pointer"
-                                        onClick={() => !isEditing && handlePositionSelect(position)}
+                                        onClick={() => !isEditing && setSelectedPosition(position)}
                                     >
                                         <div className="flex items-start space-x-3 mb-4">
                                             <div className="flex-1">
@@ -1289,28 +1185,28 @@
                                                         <input
                                                             type="text"
                                                             value={position.name}
-                                                            onChange={(e) => updatePosition(position.id, { name: e.target.value })}
+                                                            onChange={(e) => updatePosition(position.id, { ...position, name: e.target.value })}
                                                             className="w-full font-semibold text-gray-800 border rounded px-2 py-1"
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
                                                         <input
                                                             type="text"
                                                             value={position.department}
-                                                            onChange={(e) => updatePosition(position.id, { department: e.target.value })}
+                                                            onChange={(e) => updatePosition(position.id, { ...position, department: e.target.value })}
                                                             className="w-full text-sm text-gray-600 border rounded px-2 py-1"
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
                                                         <input
                                                             type="text"
                                                             value={position.hiringManager}
-                                                            onChange={(e) => updatePosition(position.id, { hiringManager: e.target.value })}
+                                                            onChange={(e) => updatePosition(position.id, { ...position, hiringManager: e.target.value })}
                                                             className="w-full text-sm text-gray-600 border rounded px-2 py-1"
                                                             placeholder="採用責任者を入力"
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
                                                         <select
                                                             value={position.hiringAttribute}
-                                                            onChange={(e) => updatePosition(position.id, { hiringAttribute: e.target.value })}
+                                                            onChange={(e) => updatePosition(position.id, { ...position, hiringAttribute: e.target.value })}
                                                             className="w-full text-sm text-gray-600 border rounded px-2 py-1"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
@@ -1361,50 +1257,29 @@
                                     
                                     {!isEditing && (
                                         <div className="space-y-3">
-                                            <div className="grid grid-cols-5 gap-2 text-center">
-                                                <div>
-                                                    <div className="text-lg font-bold text-blue-600">{stats.totalCandidates}</div>
-                                                    <div className="text-xs text-gray-500">総候補者</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-pink-600">{stats.applicationCount}</div>
-                                                    <div className="text-xs text-gray-500">応募</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-blue-600">{stats.screeningCount}</div>
-                                                    <div className="text-xs text-gray-500">書類選考</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-orange-600">{stats.interview1Count}</div>
-                                                    <div className="text-xs text-gray-500">一次面接</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-purple-600">{stats.interview2Count}</div>
-                                                    <div className="text-xs text-gray-500">二次面接</div>
-                                                </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-blue-600">{stats.totalCandidates}</div>
+                                                <div className="text-sm text-gray-500">総候補者数</div>
                                             </div>
-                                            <div className="grid grid-cols-5 gap-2 text-center">
-                                                <div>
-                                                    <div className="text-lg font-bold text-indigo-600">{stats.finalCount}</div>
-                                                    <div className="text-xs text-gray-500">最終面接</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-green-600">{stats.offerCount}</div>
-                                                    <div className="text-xs text-gray-500">内定</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-emerald-600">{stats.hiredCount}</div>
-                                                    <div className="text-xs text-gray-500">採用決定</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-orange-600">{stats.declinedCount}</div>
-                                                    <div className="text-xs text-gray-500">辞退</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-red-600">{stats.rejectedCount}</div>
-                                                    <div className="text-xs text-gray-500">不合格</div>
-                                                </div>
+                                            
+                                            <div className="grid grid-cols-3 gap-2 text-center">
+                                                {position.phases.slice(0, 6).map((phase) => (
+                                                    <div key={phase.id}>
+                                                        <div className={`text-lg font-bold text-white px-2 py-1 rounded text-sm ${phase.color}`}>
+                                                            {phase.candidates.length}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-1">
+                                                            {phase.name.length > 4 ? `${phase.name.substring(0, 4)}...` : phase.name}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
+
+                                            {position.customFields && position.customFields.length > 0 && (
+                                                <div className="text-xs text-gray-500 pt-2 border-t">
+                                                    <span className="font-medium">カスタムフィールド:</span> {position.customFields.length}個
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1419,36 +1294,72 @@
                         onAdd={addPosition}
                         onCancel={() => setShowAddPosition(false)}
                     />
+
+                    <CustomFieldsModal
+                        isOpen={showCustomFields}
+                        position={selectedPosition}
+                        onUpdatePosition={updatePosition}
+                        onClose={() => {
+                            setShowCustomFields(false);
+                            setSelectedPosition(null);
+                        }}
+                    />
+                </div>
+            );
+        };
+
+        // ログインコンポーネント
+        const LoginComponent = ({ onLogin }) => {
+            const [password, setPassword] = useState('');
+            
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (password === 'salowin2025') {
+                    onLogin();
+                } else {
+                    alert('パスワードが正しくありません');
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-100">
+                    <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+                        <h2 className="text-2xl font-bold mb-6 text-center">サロウィン社内専用</h2>
+                        <p className="text-gray-600 mb-4 text-center">採用管理システム（カスタムフィールド版）<br/>パスワードを入力してください</p>
+                        <form onSubmit={handleSubmit}>
+                            <input
+                                type="password"
+                                placeholder="パスワードを入力"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full border rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                required
+                            />
+                            <button 
+                                type="submit"
+                                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-medium"
+                            >
+                                ログイン
+                            </button>
+                        </form>
+                        <div className="mt-4 text-xs text-gray-500 text-center">
+                            カスタムフィールド機能付き
+                        </div>
+                    </div>
                 </div>
             );
         };
 
         // メインアプリ
         const App = () => {
-            const [isAuthenticated, setIsAuthenticated] = useState(() => {
-                try {
-                    return localStorage.getItem('authenticated') === 'true';
-                } catch {
-                    return false;
-                }
-            });
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
 
             const handleLogin = () => {
                 setIsAuthenticated(true);
-                try {
-                    localStorage.setItem('authenticated', 'true');
-                } catch (error) {
-                    console.error('Failed to save authentication state:', error);
-                }
             };
 
             const handleLogout = () => {
                 setIsAuthenticated(false);
-                try {
-                    localStorage.removeItem('authenticated');
-                } catch (error) {
-                    console.error('Failed to remove authentication state:', error);
-                }
             };
 
             if (!isAuthenticated) {
