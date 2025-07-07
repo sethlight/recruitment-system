@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>採用管理システム</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        // 簡易認証機能付きのコード
+        const { useState, useCallback, useMemo } = React;
+
+        // パスワード認証コンポーネント
+        const LoginComponent = ({ onLogin }) => {
+            const [password, setPassword] = useState('');
+            
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (password === 'company2024') { // パスワードは後で変更可能
+                    onLogin();
+                } else {
+                    alert('パスワードが正しくありません');
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-100">
+                    <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+                        <h2 className="text-2xl font-bold mb-6 text-center">社内メンバー専用</h2>
+                        <p className="text-gray-600 mb-4 text-center">採用管理システムにアクセスするには<br/>パスワードを入力してください</p>
+                        <form onSubmit={handleSubmit}>
+                            <input
+                                type="password"
+                                placeholder="パスワードを入力"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full border rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                required
+                            />
+                            <button 
+                                type="submit"
+                                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-medium"
+                            >
+                                ログイン
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // ここに採用管理システムのコードを挿入
+        // （長いので省略しますが、実際には先ほどのReactコンポーネント全体をここに配置）
+
+        // メインアプリコンポーネント
+        const App = () => {
+            const [isAuthenticated, setIsAuthenticated] = useState(() => {
+                return localStorage.getItem('authenticated') === 'true';
+            });
+
+            const handleLogin = () => {
+                setIsAuthenticated(true);
+                localStorage.setItem('authenticated', 'true');
+            };
+
+            const handleLogout = () => {
+                setIsAuthenticated(false);
+                localStorage.removeItem('authenticated');
+            };
+
+            if (!isAuthenticated) {
+                return <LoginComponent onLogin={handleLogin} />;
+            }
+
+            return (
+                <div>
+                    <div className="absolute top-4 right-4">
+                        <button 
+                            onClick={handleLogout}
+                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm"
+                        >
+                            ログアウト
+                        </button>
+                    </div>
+                    <RecruitmentPositionKanban />
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
