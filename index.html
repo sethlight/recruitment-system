@@ -78,6 +78,14 @@
             </svg>
         );
 
+        const Workflow = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <rect width="8" height="8" x="3" y="3" rx="2"/>
+                <path d="m7 11 0 4.5M11 15.5a4.5 4.5 0 0 1 4.5-4.5"/>
+                <rect width="8" height="8" x="13" y="13" rx="2"/>
+            </svg>
+        );
+
         // フィールドタイプの定数
         const FIELD_TYPES = [
             { value: 'text', label: 'テキスト' },
@@ -97,8 +105,24 @@
           { value: 'none', label: '特になし' }
         ];
 
-        // 採用フェーズの定数
-        const RECRUITMENT_PHASES = [
+        // 利用可能な色の定数
+        const AVAILABLE_COLORS = [
+          { value: 'bg-pink-500', label: 'ピンク' },
+          { value: 'bg-blue-500', label: 'ブルー' },
+          { value: 'bg-orange-500', label: 'オレンジ' },
+          { value: 'bg-purple-500', label: 'パープル' },
+          { value: 'bg-indigo-500', label: 'インディゴ' },
+          { value: 'bg-green-500', label: 'グリーン' },
+          { value: 'bg-emerald-500', label: 'エメラルド' },
+          { value: 'bg-red-500', label: 'レッド' },
+          { value: 'bg-yellow-500', label: 'イエロー' },
+          { value: 'bg-cyan-500', label: 'シアン' },
+          { value: 'bg-gray-500', label: 'グレー' },
+          { value: 'bg-teal-500', label: 'ティール' }
+        ];
+
+        // デフォルトの採用フェーズ
+        const DEFAULT_RECRUITMENT_PHASES = [
           { id: 'application', name: '応募', color: 'bg-pink-500' },
           { id: 'screening', name: '書類選考', color: 'bg-blue-500' },
           { id: 'interview1', name: '一次面接', color: 'bg-orange-500' },
@@ -109,6 +133,244 @@
           { id: 'declined', name: '辞退', color: 'bg-orange-500' },
           { id: 'rejected', name: '不合格', color: 'bg-red-500' }
         ];
+
+        // フェーズ編集モーダル
+        const PhaseEditModal = ({ isOpen, position, onUpdatePosition, onClose }) => {
+            const [editingPhases, setEditingPhases] = useState([]);
+            const [newPhase, setNewPhase] = useState({ name: '', color: 'bg-blue-500' });
+
+            useEffect(() => {
+                if (position) {
+                    setEditingPhases([...(position.phases || [])]);
+                }
+            }, [position]);
+
+            if (!isOpen || !position) return null;
+
+            const handlePhaseUpdate = (phaseId, updates) => {
+                setEditingPhases(prev => 
+                    prev.map(phase => phase.id === phaseId ? { ...phase, ...updates } : phase)
+                );
+            };
+
+            const handleAddPhase = () => {
+                if (!newPhase.name.trim()) return;
+                
+                const phase = {
+                    id: `phase_${Date.now()}`,
+                    name: newPhase.name.trim(),
+                    color: newPhase.color,
+                    candidates: []
+                };
+                
+                setEditingPhases(prev => [...prev, phase]);
+                setNewPhase({ name: '', color: 'bg-blue-500' });
+            };
+
+            const handleDeletePhase = (phaseId) => {
+                const phaseToDelete = editingPhases.find(p => p.id === phaseId);
+                const candidateCount = phaseToDelete?.candidates?.length || 0;
+                
+                if (candidateCount > 0) {
+                    if (!confirm(`「${phaseToDelete?.name}」フェーズを削除しますか？\n\n⚠️ 注意: このフェーズには${candidateCount}名の候補者がいます。削除すると候補者データも失われます。`)) {
+                        return;
+                    }
+                } else {
+                    if (!confirm(`「${phaseToDelete?.name}」フェーズを削除しますか？`)) {
+                        return;
+                    }
+                }
+                
+                setEditingPhases(prev => prev.filter(phase => phase.id !== phaseId));
+            };
+
+            const handleMovePhase = (phaseId, direction) => {
+                const currentIndex = editingPhases.findIndex(p => p.id === phaseId);
+                if (currentIndex === -1) return;
+                
+                const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+                if (newIndex < 0 || newIndex >= editingPhases.length) return;
+                
+                const newPhases = [...editingPhases];
+                [newPhases[currentIndex], newPhases[newIndex]] = [newPhases[newIndex], newPhases[currentIndex]];
+                setEditingPhases(newPhases);
+            };
+
+            const handleSave = () => {
+                onUpdatePosition(position.id, {
+                    ...position,
+                    phases: editingPhases
+                });
+                onClose();
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-lg font-semibold mb-4">採用フェーズ設定 - {position.name}</h3>
+                        
+                        <div className="space-y-3 mb-6">
+                            {editingPhases.length === 0 && (
+                                <div className="text-center py-8 text-gray-500">
+                                    <p className="text-sm">まだフェーズが設定されていません</p>
+                                    <p className="text-xs mt-1">下記のフォームから新しいフェーズを追加してください</p>
+                                </div>
+                            )}
+                            {editingPhases.map((phase, index) => (
+                                <div key={phase.id} className="border rounded-lg p-4 bg-gray-50">
+                                    <div className="flex items-center space-x-3 mb-3">
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-sm text-gray-500 font-mono w-6">{index + 1}.</span>
+                                            <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={phase.name}
+                                            onChange={(e) => handlePhaseUpdate(phase.id, { name: e.target.value })}
+                                            className="flex-1 border rounded px-3 py-2 font-medium bg-white"
+                                            placeholder="フェーズ名を入力"
+                                        />
+                                        <select
+                                            value={phase.color}
+                                            onChange={(e) => handlePhaseUpdate(phase.id, { color: e.target.value })}
+                                            className="border rounded px-3 py-2 bg-white"
+                                        >
+                                            {AVAILABLE_COLORS.map(color => (
+                                                <option key={color.value} value={color.value}>
+                                                    {color.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="flex items-center space-x-1">
+                                            <button
+                                                onClick={() => handleMovePhase(phase.id, 'up')}
+                                                disabled={index === 0}
+                                                className="text-gray-500 hover:text-gray-700 disabled:text-gray-300 p-1 bg-white rounded border hover:bg-gray-50"
+                                                title="上に移動"
+                                            >
+                                                ↑
+                                            </button>
+                                            <button
+                                                onClick={() => handleMovePhase(phase.id, 'down')}
+                                                disabled={index === editingPhases.length - 1}
+                                                className="text-gray-500 hover:text-gray-700 disabled:text-gray-300 p-1 bg-white rounded border hover:bg-gray-50"
+                                                title="下に移動"
+                                            >
+                                                ↓
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeletePhase(phase.id)}
+                                                className="text-red-500 hover:text-red-700 p-1 bg-white rounded border hover:bg-red-50"
+                                                title="このフェーズを削除"
+                                            >
+                                                <Trash2 />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {phase.candidates && phase.candidates.length > 0 && (
+                                        <div className="ml-6 text-xs text-gray-600">
+                                            👥 このフェーズには {phase.candidates.length} 名の候補者がいます
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="border-t pt-4 mb-6 bg-blue-50 p-4 rounded-lg">
+                            <h4 className="font-medium mb-3 text-blue-800">🆕 新しいフェーズを追加</h4>
+                            <div className="space-y-3">
+                                <div className="flex space-x-3">
+                                    <input
+                                        type="text"
+                                        placeholder="フェーズ名（例：適性検査、役員面接、最終確認）"
+                                        value={newPhase.name}
+                                        onChange={(e) => setNewPhase(prev => ({ ...prev, name: e.target.value }))}
+                                        className="flex-1 border rounded px-3 py-2 bg-white"
+                                    />
+                                    <div className="flex items-center space-x-2">
+                                        <div className={`w-4 h-4 rounded-full ${newPhase.color}`}></div>
+                                        <select
+                                            value={newPhase.color}
+                                            onChange={(e) => setNewPhase(prev => ({ ...prev, color: e.target.value }))}
+                                            className="border rounded px-3 py-2 bg-white"
+                                        >
+                                            {AVAILABLE_COLORS.map(color => (
+                                                <option key={color.value} value={color.value}>
+                                                    {color.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        onClick={handleAddPhase}
+                                        disabled={!newPhase.name.trim()}
+                                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-4 py-2 rounded font-medium"
+                                    >
+                                        フェーズ追加
+                                    </button>
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                    💡 ヒント: フェーズの順序は上下矢印ボタンで変更できます
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-yellow-50 p-4 rounded-lg mb-4">
+                            <h4 className="font-medium text-yellow-800 mb-2">📋 プリセットフェーズを追加</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {DEFAULT_RECRUITMENT_PHASES.map(preset => {
+                                    const exists = editingPhases.some(p => p.name === preset.name);
+                                    return (
+                                        <button
+                                            key={preset.id}
+                                            onClick={() => {
+                                                if (!exists) {
+                                                    const phase = {
+                                                        id: `phase_${Date.now()}_${preset.id}`,
+                                                        name: preset.name,
+                                                        color: preset.color,
+                                                        candidates: []
+                                                    };
+                                                    setEditingPhases(prev => [...prev, phase]);
+                                                }
+                                            }}
+                                            disabled={exists}
+                                            className={`text-xs px-3 py-1 rounded border ${
+                                                exists 
+                                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                                    : 'bg-white hover:bg-gray-50 text-gray-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center space-x-1">
+                                                <div className={`w-3 h-3 rounded-full ${preset.color}`}></div>
+                                                <span>{preset.name}</span>
+                                                {exists && <span>✓</span>}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                            >
+                                保存
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         // カスタムフィールド入力コンポーネント
         const CustomFieldInput = ({ field, value, onChange }) => {
@@ -694,6 +956,26 @@
 
           const displayFields = getDisplayCustomFields();
 
+          // クイックアクションボタンを生成（現在のフェーズから移動可能なフェーズのみ）
+          const getQuickActions = () => {
+            const actions = [];
+            const targetPhases = ['offer', 'hired', 'declined', 'rejected'];
+            
+            position.phases.forEach(phase => {
+              if (targetPhases.some(target => phase.name.includes(target) || phase.id === target) && phase.id !== phaseId) {
+                actions.push({
+                  id: phase.id,
+                  name: phase.name,
+                  color: phase.color
+                });
+              }
+            });
+
+            return actions;
+          };
+
+          const quickActions = getQuickActions();
+
           return (
             <div 
               className={`bg-white rounded-lg shadow-sm border-2 p-3 mb-2 hover:shadow-md transition-all relative cursor-pointer ${
@@ -820,42 +1102,18 @@
               )}
 
               <div className="flex items-center space-x-1 flex-wrap gap-1 mb-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'offer');
-                  }}
-                  className="text-xs bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded"
-                >
-                  内定
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'hired');
-                  }}
-                  className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded"
-                >
-                  採用
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'declined');
-                  }}
-                  className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded"
-                >
-                  辞退
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'rejected');
-                  }}
-                  className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded"
-                >
-                  不合格
-                </button>
+                {quickActions.map((action) => (
+                  <button
+                    key={action.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoveCandidate(candidate.id, phaseId, action.id);
+                    }}
+                    className={`text-xs ${action.color.replace('bg-', 'bg-')} hover:opacity-80 text-white px-2 py-1 rounded`}
+                  >
+                    {action.name}
+                  </button>
+                ))}
               </div>
 
               <div className="flex items-center justify-between text-xs text-gray-400">
@@ -962,6 +1220,7 @@
             const [editingPosition, setEditingPosition] = useState(null);
             const [showAddPosition, setShowAddPosition] = useState(false);
             const [showCustomFields, setShowCustomFields] = useState(false);
+            const [showPhaseEdit, setShowPhaseEdit] = useState(false);
             const [newPosition, setNewPosition] = useState({
                 name: '',
                 department: '',
@@ -982,7 +1241,7 @@
                       department: 'リテール事業部',
                       hiringManager: '田中マネージャー',
                       hiringAttribute: 'experienced',
-                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
+                      phases: DEFAULT_RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
                       customFields: [
                         { id: 'contact', name: '連絡先', type: 'email', required: true },
                         { id: 'experience', name: '経験年数', type: 'number', required: false },
@@ -995,7 +1254,7 @@
                       department: 'リテール事業部',
                       hiringManager: '山田部長',
                       hiringAttribute: 'potential',
-                      phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
+                      phases: DEFAULT_RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
                       customFields: [
                         { id: 'contact', name: '連絡先', type: 'email', required: true },
                         { id: 'experience', name: '経験年数', type: 'number', required: false }
@@ -1141,7 +1400,7 @@
                     department: newPosition.department.trim(),
                     hiringManager: newPosition.hiringManager.trim(),
                     hiringAttribute: newPosition.hiringAttribute,
-                    phases: RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
+                    phases: DEFAULT_RECRUITMENT_PHASES.map(phase => ({ ...phase, candidates: [] })),
                     customFields: [
                         { id: 'contact', name: '連絡先', type: 'email', required: true },
                         { id: 'experience', name: '経験年数', type: 'number', required: false }
@@ -1196,6 +1455,13 @@
                                     <span className="text-sm">← ポジション一覧に戻る</span>
                                 </button>
                                 <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => setShowPhaseEdit(true)}
+                                        className="flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg text-sm"
+                                    >
+                                        <Workflow />
+                                        <span>フェーズ設定</span>
+                                    </button>
                                     <button
                                         onClick={() => setShowCustomFields(true)}
                                         className="flex items-center space-x-2 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm"
@@ -1282,6 +1548,13 @@
                             ))}
                         </div>
 
+                        <PhaseEditModal
+                            isOpen={showPhaseEdit}
+                            position={selectedPosition}
+                            onUpdatePosition={updatePosition}
+                            onClose={() => setShowPhaseEdit(false)}
+                        />
+
                         <CustomFieldsModal
                             isOpen={showCustomFields}
                             position={selectedPosition}
@@ -1328,6 +1601,17 @@
                             return (
                                 <div key={position.id} className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow relative">
                                     <div className="absolute top-4 right-4 flex items-center space-x-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedPosition(position);
+                                                setShowPhaseEdit(true);
+                                            }}
+                                            className="text-gray-400 hover:text-purple-600 p-1"
+                                            title="フェーズ設定"
+                                        >
+                                            <Workflow />
+                                        </button>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -1451,11 +1735,14 @@
                                                 ))}
                                             </div>
 
-                                            {position.customFields && position.customFields.length > 0 && (
-                                                <div className="text-xs text-gray-500 pt-2 border-t">
-                                                    <span className="font-medium">カスタムフィールド:</span> {position.customFields.length}個
-                                                </div>
-                                            )}
+                                            <div className="flex justify-between text-xs text-gray-500 pt-2 border-t">
+                                                <span>
+                                                    <span className="font-medium">フェーズ:</span> {position.phases.length}個
+                                                </span>
+                                                <span>
+                                                    <span className="font-medium">フィールド:</span> {position.customFields?.length || 0}個
+                                                </span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1469,6 +1756,16 @@
                         onPositionChange={setNewPosition}
                         onAdd={addPosition}
                         onCancel={() => setShowAddPosition(false)}
+                    />
+
+                    <PhaseEditModal
+                        isOpen={showPhaseEdit}
+                        position={selectedPosition}
+                        onUpdatePosition={updatePosition}
+                        onClose={() => {
+                            setShowPhaseEdit(false);
+                            setSelectedPosition(null);
+                        }}
                     />
 
                     <CustomFieldsModal
@@ -1520,7 +1817,7 @@
                         </form>
                         <div className="mt-4 text-xs text-gray-500 text-center">
                             社内チーム全体でデータを共有します<br/>
-                            カスタムフィールド機能付き
+                            フェーズ編集＆カスタムフィールド機能付き
                         </div>
                     </div>
                 </div>
