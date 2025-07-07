@@ -1139,23 +1139,10 @@
                         
                         <div className="mb-6">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center space-x-4">
-                                    <BackButton 
-                                        navigationHistory={navigationHistory}
-                                        onBack={handleBackNavigation}
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            setSelectedPosition(null);
-                                            setSelectedCandidate(null);
-                                            navigationHistory.clear();
-                                        }}
-                                        className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
-                                    >
-                                        <ArrowLeft />
-                                        <span>ポジション一覧に戻る</span>
-                                    </button>
-                                </div>
+                                <BackButton 
+                                    navigationHistory={navigationHistory}
+                                    onBack={handleBackNavigation}
+                                />
                             </div>
                             <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
                             <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
