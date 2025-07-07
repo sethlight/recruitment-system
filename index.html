@@ -136,6 +136,85 @@
             );
         };
 
+        // 候補者詳細モーダル
+        const CandidateDetailModal = ({ 
+          isOpen, 
+          candidate, 
+          phaseId, 
+          onUpdate, 
+          onClose 
+        }) => {
+          const [editData, setEditData] = useState({
+            name: candidate?.name || '',
+            notes: candidate?.notes || ''
+          });
+
+          React.useEffect(() => {
+            if (candidate) {
+              setEditData({
+                name: candidate.name || '',
+                notes: candidate.notes || ''
+              });
+            }
+          }, [candidate]);
+
+          if (!isOpen || !candidate) return null;
+
+          const handleSave = () => {
+            onUpdate(phaseId, candidate.id, editData);
+            onClose();
+          };
+
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-96 overflow-y-auto">
+                <h3 className="text-lg font-semibold mb-4">候補者詳細編集</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      候補者名
+                    </label>
+                    <input
+                      type="text"
+                      value={editData.name}
+                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      メモ・詳細情報
+                    </label>
+                    <textarea
+                      value={editData.notes}
+                      onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2 h-32 resize-none"
+                      placeholder="候補者に関するメモや詳細情報を入力してください..."
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    <strong>登録日:</strong> {new Date(candidate.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="flex space-x-2 mt-6">
+                  <button
+                    onClick={onClose}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                  >
+                    保存
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
         // 候補者カード
         const CandidateCard = ({ 
           candidate, 
@@ -144,7 +223,8 @@
           onMoveCandidate,
           onDeleteCandidate,
           selectedCandidate,
-          onCandidateClick
+          onCandidateClick,
+          onOpenDetail
         }) => {
           const [showMenu, setShowMenu] = useState(false);
           const [isEditing, setIsEditing] = useState(false);
@@ -159,6 +239,10 @@
               onClick={(e) => {
                 e.stopPropagation();
                 onCandidateClick(candidate);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onOpenDetail(candidate);
               }}
               onDragStart={(e) => {
                 if (isSelected) {
@@ -215,13 +299,24 @@
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            onOpenDetail(candidate);
+                            setShowMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center space-x-2"
+                        >
+                          <Edit3 />
+                          <span>詳細編集</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setIsEditing(true);
                             setShowMenu(false);
                           }}
                           className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center space-x-2"
                         >
                           <Edit3 />
-                          <span>編集</span>
+                          <span>名前編集</span>
                         </button>
                         <button
                           onClick={(e) => {
@@ -243,8 +338,8 @@
               </div>
 
               {candidate.notes && (
-                <div className="text-xs text-gray-600 mb-2 bg-gray-50 p-2 rounded">
-                  {candidate.notes}
+                <div className="text-xs text-gray-600 mb-2 bg-gray-50 p-2 rounded max-h-16 overflow-y-auto">
+                  {candidate.notes.length > 50 ? `${candidate.notes.substring(0, 50)}...` : candidate.notes}
                 </div>
               )}
 
@@ -287,12 +382,15 @@
                 </button>
               </div>
 
-              <div className="flex items-center text-xs text-gray-400">
-                <Clock />
-                <span className="ml-1">{new Date(candidate.createdAt).toLocaleDateString()}</span>
-                {isSelected && (
-                  <span className="ml-2 text-blue-600">（ドラッグで移動可能）</span>
-                )}
+              <div className="flex items-center justify-between text-xs text-gray-400">
+                <div className="flex items-center">
+                  <Clock />
+                  <span className="ml-1">{new Date(candidate.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className="text-blue-500">
+                  {isSelected && <span>（ドラッグ可能）</span>}
+                  <span className="ml-1">ダブルクリックで詳細</span>
+                </div>
               </div>
             </div>
           );
@@ -395,11 +493,11 @@
                       hiringAttribute: 'experienced',
                       phases: [
                         { ...RECRUITMENT_PHASES[0], candidates: [
-                          { id: 'pos1-app1', name: 'Aさん', notes: '経験豊富', createdAt: new Date().toISOString() },
+                          { id: 'pos1-app1', name: 'Aさん', notes: '経験豊富。前職でネイル業界5年の経験あり。', createdAt: new Date().toISOString() },
                           { id: 'pos1-app2', name: 'Bさん', notes: '', createdAt: new Date().toISOString() }
                         ]},
                         { ...RECRUITMENT_PHASES[1], candidates: [
-                          { id: 'pos1-scr1', name: 'Cさん', notes: '書類通過', createdAt: new Date().toISOString() }
+                          { id: 'pos1-scr1', name: 'Cさん', notes: '書類通過。資格多数保有。', createdAt: new Date().toISOString() }
                         ]},
                         ...RECRUITMENT_PHASES.slice(2).map(phase => ({ ...phase, candidates: [] }))
                       ]
@@ -416,7 +514,7 @@
                         ]},
                         { ...RECRUITMENT_PHASES[1], candidates: [] },
                         { ...RECRUITMENT_PHASES[2], candidates: [
-                          { id: 'pos2-int1', name: 'Eさん', notes: '面接良好', createdAt: new Date().toISOString() }
+                          { id: 'pos2-int1', name: 'Eさん', notes: '面接良好。コミュニケーション能力高い。', createdAt: new Date().toISOString() }
                         ]},
                         ...RECRUITMENT_PHASES.slice(3).map(phase => ({ ...phase, candidates: [] }))
                       ]
@@ -436,6 +534,10 @@
                 hiringAttribute: 'none'
             });
 
+            const [detailModalOpen, setDetailModalOpen] = useState(false);
+            const [detailEditingCandidate, setDetailEditingCandidate] = useState(null);
+            const [detailEditingPhase, setDetailEditingPhase] = useState(null);
+
             // データをローカルストレージに保存
             const saveData = useCallback((data) => {
                 localStorage.setItem('recruitmentPositions', JSON.stringify(data));
@@ -445,6 +547,16 @@
             const handleCandidateClick = useCallback((candidate) => {
                 setSelectedCandidate(prev => prev?.id === candidate.id ? null : candidate);
             }, []);
+
+            // 詳細モーダルを開く
+            const openCandidateDetail = useCallback((candidate) => {
+                const phase = selectedPosition.phases.find(p => 
+                    p.candidates.some(c => c.id === candidate.id)
+                );
+                setDetailEditingCandidate(candidate);
+                setDetailEditingPhase(phase.id);
+                setDetailModalOpen(true);
+            }, [selectedPosition]);
 
             // 候補者を追加
             const addCandidate = useCallback((phaseId, candidateName) => {
@@ -600,96 +712,98 @@
                 saveData(updatedPositions);
                 
                 if (selectedPosition?.id === positionId) {
-                    setSelectedPosition(null);
-                }
-            }, [positions, selectedPosition, saveData]);
+                    setSelectedPosition(
+                        setSelectedPosition(null);
+               }
+           }, [positions, selectedPosition, saveData]);
 
-            const getPositionStats = (position) => {
-                const totalCandidates = position.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
-                const applicationCount = position.phases.find(p => p.id === 'application')?.candidates.length || 0;
-                const screeningCount = position.phases.find(p => p.id === 'screening')?.candidates.length || 0;
-                const interview1Count = position.phases.find(p => p.id === 'interview1')?.candidates.length || 0;
-                const interview2Count = position.phases.find(p => p.id === 'interview2')?.candidates.length || 0;
-                const finalCount = position.phases.find(p => p.id === 'final')?.candidates.length || 0;
-                const offerCount = position.phases.find(p => p.id === 'offer')?.candidates.length || 0;
-                const hiredCount = position.phases.find(p => p.id === 'hired')?.candidates.length || 0;
-                const declinedCount = position.phases.find(p => p.id === 'declined')?.candidates.length || 0;
-                const rejectedCount = position.phases.find(p => p.id === 'rejected')?.candidates.length || 0;
-                
-                return { 
-                  totalCandidates, 
-                  applicationCount,
-                  screeningCount,
-                  interview1Count,
-                  interview2Count,
-                  finalCount,
-                  offerCount,
-                  hiredCount, 
-                  declinedCount, 
-                  rejectedCount 
-                };
-            };
+           const getPositionStats = (position) => {
+               const totalCandidates = position.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
+               const applicationCount = position.phases.find(p => p.id === 'application')?.candidates.length || 0;
+               const screeningCount = position.phases.find(p => p.id === 'screening')?.candidates.length || 0;
+               const interview1Count = position.phases.find(p => p.id === 'interview1')?.candidates.length || 0;
+               const interview2Count = position.phases.find(p => p.id === 'interview2')?.candidates.length || 0;
+               const finalCount = position.phases.find(p => p.id === 'final')?.candidates.length || 0;
+               const offerCount = position.phases.find(p => p.id === 'offer')?.candidates.length || 0;
+               const hiredCount = position.phases.find(p => p.id === 'hired')?.candidates.length || 0;
+               const declinedCount = position.phases.find(p => p.id === 'declined')?.candidates.length || 0;
+               const rejectedCount = position.phases.find(p => p.id === 'rejected')?.candidates.length || 0;
+               
+               return { 
+                 totalCandidates, 
+                 applicationCount,
+                 screeningCount,
+                 interview1Count,
+                 interview2Count,
+                 finalCount,
+                 offerCount,
+                 hiredCount, 
+                 declinedCount, 
+                 rejectedCount 
+               };
+           };
 
-            // カンバンボード表示
-            if (selectedPosition) {
-                const totalCandidates = selectedPosition.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
+           // カンバンボード表示
+           if (selectedPosition) {
+               const totalCandidates = selectedPosition.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
 
-                return (
-                    <div className="p-6 bg-gray-100 min-h-screen">
-                        <div className="mb-6">
-                            <button
-                                onClick={() => {
-                                    setSelectedPosition(null);
-                                    setSelectedCandidate(null);
-                                }}
-                                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
-                            >
-                                <ArrowLeft />
-                                <span>ポジション一覧に戻る</span>
-                            </button>
-                            <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
-                            <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
-                        </div>
+               return (
+                   <div className="p-6 bg-gray-100 min-h-screen">
+                       <div className="mb-6">
+                           <button
+                               onClick={() => {
+                                   setSelectedPosition(null);
+                                   setSelectedCandidate(null);
+                               }}
+                               className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
+                           >
+                               <ArrowLeft />
+                               <span>ポジション一覧に戻る</span>
+                           </button>
+                           <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
+                           <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
+                       </div>
 
-                        <div className="flex gap-4 overflow-x-auto pb-4">
-                            {selectedPosition.phases.map((phase) => (
-                                <div 
-                                    key={phase.id} 
-                                    className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
-                                        selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
-                                    }`}
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        e.dataTransfer.dropEffect = 'move';
-                                    }}
-                                    onDragEnter={(e) => e.preventDefault()}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                        if (data.candidateId && data.fromPhaseId !== phase.id) {
-                                            moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
-                                            setSelectedCandidate(null);
-                                        }
-                                    }}
-                                >
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center space-x-2">
-                                            <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
-                                            <h2 className="font-semibold text-gray-800">{phase.name}</h2>
-                                        </div>
-                                        <span className="text-sm text-gray-500">{phase.candidates.length}</span>
-                                    </div>
+                       <div className="flex gap-4 overflow-x-auto pb-4">
+                           {selectedPosition.phases.map((phase) => (
+                               <div 
+                                   key={phase.id} 
+                                   className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
+                                       selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
+                                   }`}
+                                   onDragOver={(e) => {
+                                       e.preventDefault();
+                                       e.dataTransfer.dropEffect = 'move';
+                                   }}
+                                   onDragEnter={(e) => e.preventDefault()}
+                                   onDrop={(e) => {
+                                       e.preventDefault();
+                                       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                                       if (data.candidateId && data.fromPhaseId !== phase.id) {
+                                           moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
+                                           setSelectedCandidate(null);
+                                       }
+                                   }}
+                               >
+                                   <div className="flex items-center justify-between mb-4">
+                                       <div className="flex items-center space-x-2">
+                                           <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
+                                           <h2 className="font-semibold text-gray-800">{phase.name}</h2>
+                                       </div>
+                                       <span className="text-sm text-gray-500">{phase.candidates.length}</span>
+                                   </div>
 
-                                    <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
-                                        {phase.candidates.map((candidate) => (
-                                            <CandidateCard
-                                                key={candidate.id}
-                                                candidate={candidate}
-                                                phaseId={phase.id}
-                                                selectedCandidate={selectedCandidate}
-                                                onCandidateClick={handleCandidateClick}
-                                                onUpdateCandidate={updateCandidate}
-                                                onMoveCandidate={moveCandidate}
+                                   <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                                       {phase.candidates.map((candidate) => (
+                                           <CandidateCard
+                                               key={candidate.id}
+                                               candidate={candidate}
+                                               phaseId={phase.id}
+                                               selectedCandidate={selectedCandidate}
+                                               onCandidateClick={handleCandidateClick}
+                                               onOpenDetail={openCandidateDetail}
+                                               onUpdateCandidate={updateCandidate}
+                                               onMoveCandidate={moveCandidate}
                                                onDeleteCandidate={deleteCandidate}
                                            />
                                        ))}
@@ -719,6 +833,18 @@
                                </div>
                            ))}
                        </div>
+
+                       <CandidateDetailModal
+                           isOpen={detailModalOpen}
+                           candidate={detailEditingCandidate}
+                           phaseId={detailEditingPhase}
+                           onUpdate={updateCandidate}
+                           onClose={() => {
+                               setDetailModalOpen(false);
+                               setDetailEditingCandidate(null);
+                               setDetailEditingPhase(null);
+                           }}
+                       />
                    </div>
                );
            }
