@@ -142,13 +142,36 @@
           phaseId, 
           onUpdateCandidate,
           onMoveCandidate,
-          onDeleteCandidate
+          onDeleteCandidate,
+          selectedCandidate,
+          onCandidateClick
         }) => {
           const [showMenu, setShowMenu] = useState(false);
           const [isEditing, setIsEditing] = useState(false);
+          const isSelected = selectedCandidate?.id === candidate.id;
 
           return (
-            <div className="bg-white rounded-lg shadow-sm border-2 p-3 mb-2 hover:shadow-md transition-all relative">
+            <div 
+              className={`bg-white rounded-lg shadow-sm border-2 p-3 mb-2 hover:shadow-md transition-all relative cursor-pointer ${
+                isSelected ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
+              }`}
+              draggable={isSelected}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCandidateClick(candidate);
+              }}
+              onDragStart={(e) => {
+                if (isSelected) {
+                  e.dataTransfer.setData('text/plain', JSON.stringify({
+                    candidateId: candidate.id,
+                    fromPhaseId: phaseId
+                  }));
+                  e.dataTransfer.effectAllowed = 'move';
+                } else {
+                  e.preventDefault();
+                }
+              }}
+            >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
@@ -163,6 +186,7 @@
                         className="font-medium text-sm border rounded px-1"
                         onBlur={() => setIsEditing(false)}
                         onKeyPress={(e) => e.key === 'Enter' && setIsEditing(false)}
+                        onClick={(e) => e.stopPropagation()}
                         autoFocus
                       />
                     ) : (
@@ -171,40 +195,50 @@
                   </div>
                 </div>
                 
-                <div className="relative">
-                  <button
-                    onClick={() => setShowMenu(!showMenu)}
-                    className="text-gray-400 hover:text-gray-600 p-1"
-                  >
-                    <MoreHorizontal />
-                  </button>
-                  
-                  {showMenu && (
-                    <div className="absolute right-0 top-6 bg-white border rounded-lg shadow-lg z-10 py-1 min-w-32">
-                      <button
-                        onClick={() => {
-                          setIsEditing(true);
-                          setShowMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center space-x-2"
-                      >
-                        <Edit3 />
-                        <span>編集</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`${candidate.name}さんを削除しますか？`)) {
-                            onDeleteCandidate(phaseId, candidate.id);
-                          }
-                          setShowMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 text-red-600 flex items-center space-x-2"
-                      >
-                        <Trash2 />
-                        <span>削除</span>
-                      </button>
-                    </div>
+                <div className="flex items-center space-x-2">
+                  {isSelected && (
+                    <span className="text-xs text-blue-600 font-medium">選択中</span>
                   )}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMenu(!showMenu);
+                      }}
+                      className="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <MoreHorizontal />
+                    </button>
+                    
+                    {showMenu && (
+                      <div className="absolute right-0 top-6 bg-white border rounded-lg shadow-lg z-10 py-1 min-w-32">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsEditing(true);
+                            setShowMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center space-x-2"
+                        >
+                          <Edit3 />
+                          <span>編集</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`${candidate.name}さんを削除しますか？`)) {
+                              onDeleteCandidate(phaseId, candidate.id);
+                            }
+                            setShowMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 text-red-600 flex items-center space-x-2"
+                        >
+                          <Trash2 />
+                          <span>削除</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -216,25 +250,37 @@
 
               <div className="flex items-center space-x-1 flex-wrap gap-1 mb-2">
                 <button
-                  onClick={() => onMoveCandidate(candidate.id, phaseId, 'offer')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveCandidate(candidate.id, phaseId, 'offer');
+                  }}
                   className="text-xs bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded"
                 >
                   内定
                 </button>
                 <button
-                  onClick={() => onMoveCandidate(candidate.id, phaseId, 'hired')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveCandidate(candidate.id, phaseId, 'hired');
+                  }}
                   className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded"
                 >
                   採用
                 </button>
                 <button
-                  onClick={() => onMoveCandidate(candidate.id, phaseId, 'declined')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveCandidate(candidate.id, phaseId, 'declined');
+                  }}
                   className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded"
                 >
                   辞退
                 </button>
                 <button
-                  onClick={() => onMoveCandidate(candidate.id, phaseId, 'rejected')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveCandidate(candidate.id, phaseId, 'rejected');
+                  }}
                   className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded"
                 >
                   不合格
@@ -244,6 +290,9 @@
               <div className="flex items-center text-xs text-gray-400">
                 <Clock />
                 <span className="ml-1">{new Date(candidate.createdAt).toLocaleDateString()}</span>
+                {isSelected && (
+                  <span className="ml-2 text-blue-600">（ドラッグで移動可能）</span>
+                )}
               </div>
             </div>
           );
@@ -376,6 +425,7 @@
             });
 
             const [selectedPosition, setSelectedPosition] = useState(null);
+            const [selectedCandidate, setSelectedCandidate] = useState(null);
             const [newTaskInputs, setNewTaskInputs] = useState({});
             const [editingPosition, setEditingPosition] = useState(null);
             const [showAddPosition, setShowAddPosition] = useState(false);
@@ -389,6 +439,11 @@
             // データをローカルストレージに保存
             const saveData = useCallback((data) => {
                 localStorage.setItem('recruitmentPositions', JSON.stringify(data));
+            }, []);
+
+            // 候補者選択
+            const handleCandidateClick = useCallback((candidate) => {
+                setSelectedCandidate(prev => prev?.id === candidate.id ? null : candidate);
             }, []);
 
             // 候補者を追加
@@ -502,6 +557,7 @@
 
                 setPositions(updatedPositions);
                 saveData(updatedPositions);
+                setSelectedCandidate(null);
             }, [selectedPosition, positions, saveData]);
 
             // ポジションを追加
@@ -582,7 +638,10 @@
                     <div className="p-6 bg-gray-100 min-h-screen">
                         <div className="mb-6">
                             <button
-                                onClick={() => setSelectedPosition(null)}
+                                onClick={() => {
+                                    setSelectedPosition(null);
+                                    setSelectedCandidate(null);
+                                }}
                                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
                             >
                                 <ArrowLeft />
@@ -594,7 +653,25 @@
 
                         <div className="flex gap-4 overflow-x-auto pb-4">
                             {selectedPosition.phases.map((phase) => (
-                                <div key={phase.id} className="min-w-80 bg-gray-50 rounded-lg p-4">
+                                <div 
+                                    key={phase.id} 
+                                    className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
+                                        selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
+                                    }`}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                    }}
+                                    onDragEnter={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                                        if (data.candidateId && data.fromPhaseId !== phase.id) {
+                                            moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
+                                            setSelectedCandidate(null);
+                                        }
+                                    }}
+                                >
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center space-x-2">
                                             <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
@@ -609,78 +686,79 @@
                                                 key={candidate.id}
                                                 candidate={candidate}
                                                 phaseId={phase.id}
+                                                selectedCandidate={selectedCandidate}
+                                                onCandidateClick={handleCandidateClick}
                                                 onUpdateCandidate={updateCandidate}
                                                 onMoveCandidate={moveCandidate}
-                                                onDeleteCandidate={deleteCandidate}
-                                            />
-                                        ))}
-                                        {phase.candidates.length === 0 && (
-                                            <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
-                                                まだ候補者がいません
-                                            </div>
-                                        )}
-                                    </div>
+                                               onDeleteCandidate={deleteCandidate}
+                                           />
+                                       ))}
+                                       {phase.candidates.length === 0 && (
+                                           <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
+                                               まだ候補者がいません
+                                           </div>
+                                       )}
+                                   </div>
 
-                                    <div className="flex items-center space-x-2 text-gray-500">
-                                        <Plus />
-                                        <input
-                                            type="text"
-                                            placeholder="候補者を追加"
-                                            value={newTaskInputs[phase.id] || ''}
-                                            onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    addCandidate(phase.id, newTaskInputs[phase.id]);
-                                                    setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
-                                                }
-                                            }}
-                                            className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            }
+                                   <div className="flex items-center space-x-2 text-gray-500">
+                                       <Plus />
+                                       <input
+                                           type="text"
+                                           placeholder="候補者を追加"
+                                           value={newTaskInputs[phase.id] || ''}
+                                           onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
+                                           onKeyPress={(e) => {
+                                               if (e.key === 'Enter') {
+                                                   addCandidate(phase.id, newTaskInputs[phase.id]);
+                                                   setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
+                                               }
+                                           }}
+                                           className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
+                                       />
+                                   </div>
+                               </div>
+                           ))}
+                       </div>
+                   </div>
+               );
+           }
 
-            // メイン画面表示
-            return (
-                <div className="p-6 bg-gray-100 min-h-screen">
-                    <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理</h1>
-                        <button
-                            onClick={() => setShowAddPosition(true)}
-                            className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                        >
-                            <Plus />
-                            <span>新規ポジション追加</span>
-                        </button>
-                    </div>
+           // メイン画面表示
+           return (
+               <div className="p-6 bg-gray-100 min-h-screen">
+                   <div className="flex items-center justify-between mb-6">
+                       <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理</h1>
+                       <button
+                           onClick={() => setShowAddPosition(true)}
+                           className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                       >
+                           <Plus />
+                           <span>新規ポジション追加</span>
+                       </button>
+                   </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {positions.map((position) => {
-                            const stats = getPositionStats(position);
-                            const isEditing = editingPosition === position.id;
-                            
-                            return (
-                                <div key={position.id} className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow relative">
-                                    <div className="absolute top-4 right-4">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditingPosition(prev => prev === position.id ? null : position.id);
-                                            }}
-                                            className="text-gray-400 hover:text-gray-600 p-1"
-                                        >
-                                            <MoreHorizontal />
-                                        </button>
-                                    </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                       {positions.map((position) => {
+                           const stats = getPositionStats(position);
+                           const isEditing = editingPosition === position.id;
+                           
+                           return (
+                               <div key={position.id} className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow relative">
+                                   <div className="absolute top-4 right-4">
+                                       <button
+                                           onClick={(e) => {
+                                               e.stopPropagation();
+                                               setEditingPosition(prev => prev === position.id ? null : position.id);
+                                           }}
+                                           className="text-gray-400 hover:text-gray-600 p-1"
+                                       >
+                                           <MoreHorizontal />
+                                       </button>
+                                   </div>
 
-                                    <div 
-                                        className="cursor-pointer"
-                                        onClick
-                                        onClick={() => !isEditing && setSelectedPosition(position)}
+                                   <div 
+                                       className="cursor-pointer"
+                                       onClick={() => !isEditing && setSelectedPosition(position)}
                                    >
                                        <div className="flex items-start space-x-3 mb-4">
                                            <div className="flex-1">
