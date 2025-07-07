@@ -1439,7 +1439,7 @@
                                             </div>
                                             
                                             <div className="grid grid-cols-3 gap-2 text-center">
-                                                {position.phases.slice(0, 6).map((phase) => (
+                                                {position.phases.map((phase) => (
                                                     <div key={phase.id}>
                                                         <div className={`text-lg font-bold text-white px-2 py-1 rounded text-sm ${phase.color}`}>
                                                             {phase.candidates.length}
