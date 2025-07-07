@@ -482,7 +482,11 @@
             const [positions, setPositions] = useState(() => {
                 const saved = localStorage.getItem('recruitmentPositions');
                 if (saved) {
-                    return JSON.parse(saved);
+                    try {
+                        return JSON.parse(saved);
+                    } catch {
+                        return [];
+                    }
                 }
                 return [
                     { 
@@ -540,7 +544,11 @@
 
             // データをローカルストレージに保存
             const saveData = useCallback((data) => {
-                localStorage.setItem('recruitmentPositions', JSON.stringify(data));
+                try {
+                    localStorage.setItem('recruitmentPositions', JSON.stringify(data));
+                } catch (error) {
+                    console.error('Failed to save to localStorage:', error);
+                }
             }, []);
 
             // 候補者選択
@@ -712,357 +720,368 @@
                 saveData(updatedPositions);
                 
                 if (selectedPosition?.id === positionId) {
-                    setSelectedPosition(setSelectedPosition(null);
-               }
-           }, [positions, selectedPosition, saveData]);
+                    setSelectedPosition(null);
+                }
+            }, [positions, selectedPosition, saveData]);
 
-           const getPositionStats = (position) => {
-               const totalCandidates = position.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
-               const applicationCount = position.phases.find(p => p.id === 'application')?.candidates.length || 0;
-               const screeningCount = position.phases.find(p => p.id === 'screening')?.candidates.length || 0;
-               const interview1Count = position.phases.find(p => p.id === 'interview1')?.candidates.length || 0;
-               const interview2Count = position.phases.find(p => p.id === 'interview2')?.candidates.length || 0;
-               const finalCount = position.phases.find(p => p.id === 'final')?.candidates.length || 0;
-               const offerCount = position.phases.find(p => p.id === 'offer')?.candidates.length || 0;
-               const hiredCount = position.phases.find(p => p.id === 'hired')?.candidates.length || 0;
-               const declinedCount = position.phases.find(p => p.id === 'declined')?.candidates.length || 0;
-               const rejectedCount = position.phases.find(p => p.id === 'rejected')?.candidates.length || 0;
-               
-               return { 
-                 totalCandidates, 
-                 applicationCount,
-                 screeningCount,
-                 interview1Count,
-                 interview2Count,
-                 finalCount,
-                 offerCount,
-                 hiredCount, 
-                 declinedCount, 
-                 rejectedCount 
-               };
-           };
+            const getPositionStats = (position) => {
+                const totalCandidates = position.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
+                const applicationCount = position.phases.find(p => p.id === 'application')?.candidates.length || 0;
+                const screeningCount = position.phases.find(p => p.id === 'screening')?.candidates.length || 0;
+                const interview1Count = position.phases.find(p => p.id === 'interview1')?.candidates.length || 0;
+                const interview2Count = position.phases.find(p => p.id === 'interview2')?.candidates.length || 0;
+                const finalCount = position.phases.find(p => p.id === 'final')?.candidates.length || 0;
+                const offerCount = position.phases.find(p => p.id === 'offer')?.candidates.length || 0;
+                const hiredCount = position.phases.find(p => p.id === 'hired')?.candidates.length || 0;
+                const declinedCount = position.phases.find(p => p.id === 'declined')?.candidates.length || 0;
+                const rejectedCount = position.phases.find(p => p.id === 'rejected')?.candidates.length || 0;
+                
+                return { 
+                  totalCandidates, 
+                  applicationCount,
+                  screeningCount,
+                  interview1Count,
+                  interview2Count,
+                  finalCount,
+                  offerCount,
+                  hiredCount, 
+                  declinedCount, 
+                  rejectedCount 
+                };
+            };
 
-           // カンバンボード表示
-           if (selectedPosition) {
-               const totalCandidates = selectedPosition.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
+            // カンバンボード表示
+            if (selectedPosition) {
+                const totalCandidates = selectedPosition.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
 
-               return (
-                   <div className="p-6 bg-gray-100 min-h-screen">
-                       <div className="mb-6">
-                           <button
-                               onClick={() => {
-                                   setSelectedPosition(null);
-                                   setSelectedCandidate(null);
-                               }}
-                               className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
-                           >
-                               <ArrowLeft />
-                               <span>ポジション一覧に戻る</span>
-                           </button>
-                           <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
-                           <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
-                       </div>
+                return (
+                    <div className="p-6 bg-gray-100 min-h-screen">
+                        <div className="mb-6">
+                            <button
+                                onClick={() => {
+                                    setSelectedPosition(null);
+                                    setSelectedCandidate(null);
+                                }}
+                                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
+                            >
+                                <ArrowLeft />
+                                <span>ポジション一覧に戻る</span>
+                            </button>
+                            <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
+                            <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
+                        </div>
 
-                       <div className="flex gap-4 overflow-x-auto pb-4">
-                           {selectedPosition.phases.map((phase) => (
-                               <div 
-                                   key={phase.id} 
-                                   className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
-                                       selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
-                                   }`}
-                                   onDragOver={(e) => {
-                                       e.preventDefault();
-                                       e.dataTransfer.dropEffect = 'move';
-                                   }}
-                                   onDragEnter={(e) => e.preventDefault()}
-                                   onDrop={(e) => {
-                                       e.preventDefault();
-                                       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                       if (data.candidateId && data.fromPhaseId !== phase.id) {
-                                           moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
-                                           setSelectedCandidate(null);
-                                       }
-                                   }}
-                               >
-                                   <div className="flex items-center justify-between mb-4">
-                                       <div className="flex items-center space-x-2">
-                                           <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
-                                           <h2 className="font-semibold text-gray-800">{phase.name}</h2>
-                                       </div>
-                                       <span className="text-sm text-gray-500">{phase.candidates.length}</span>
-                                   </div>
+                        <div className="flex gap-4 overflow-x-auto pb-4">
+                            {selectedPosition.phases.map((phase) => (
+                                <div 
+                                    key={phase.id} 
+                                    className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
+                                        selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
+                                    }`}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                    }}
+                                    onDragEnter={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                                        if (data.candidateId && data.fromPhaseId !== phase.id) {
+                                            moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
+                                            setSelectedCandidate(null);
+                                        }
+                                    }}
+                                >
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center space-x-2">
+                                            <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
+                                            <h2 className="font-semibold text-gray-800">{phase.name}</h2>
+                                        </div>
+                                        <span className="text-sm text-gray-500">{phase.candidates.length}</span>
+                                    </div>
 
-                                   <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
-                                       {phase.candidates.map((candidate) => (
-                                           <CandidateCard
-                                               key={candidate.id}
-                                               candidate={candidate}
-                                               phaseId={phase.id}
-                                               selectedCandidate={selectedCandidate}
-                                               onCandidateClick={handleCandidateClick}
-                                               onOpenDetail={openCandidateDetail}
-                                               onUpdateCandidate={updateCandidate}
-                                               onMoveCandidate={moveCandidate}
-                                               onDeleteCandidate={deleteCandidate}
-                                           />
-                                       ))}
-                                       {phase.candidates.length === 0 && (
-                                           <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
-                                               まだ候補者がいません
-                                           </div>
-                                       )}
-                                   </div>
+                                    <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                                        {phase.candidates.map((candidate) => (
+                                            <CandidateCard
+                                                key={candidate.id}
+                                                candidate={candidate}
+                                                phaseId={phase.id}
+                                                selectedCandidate={selectedCandidate}
+                                                onCandidateClick={handleCandidateClick}
+                                                onOpenDetail={openCandidateDetail}
+                                                onUpdateCandidate={updateCandidate}
+                                                onMoveCandidate={moveCandidate}
+                                                onDeleteCandidate={deleteCandidate}
+                                            />
+                                        ))}
+                                        {phase.candidates.length === 0 && (
+                                            <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
+                                                まだ候補者がいません
+                                            </div>
+                                        )}
+                                    </div>
 
-                                   <div className="flex items-center space-x-2 text-gray-500">
-                                       <Plus />
-                                       <input
-                                           type="text"
-                                           placeholder="候補者を追加"
-                                           value={newTaskInputs[phase.id] || ''}
-                                           onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
-                                           onKeyPress={(e) => {
-                                               if (e.key === 'Enter') {
-                                                   addCandidate(phase.id, newTaskInputs[phase.id]);
-                                                   setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
-                                               }
-                                           }}
-                                           className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
-                                       />
-                                   </div>
-                               </div>
-                           ))}
-                       </div>
+                                    <div className="flex items-center space-x-2 text-gray-500">
+                                        <Plus />
+                                        <input
+                                            type="text"
+                                            placeholder="候補者を追加"
+                                            value={newTaskInputs[phase.id] || ''}
+                                            onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    addCandidate(phase.id, newTaskInputs[phase.id]);
+                                                    setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
+                                                }
+                                            }}
+                                            className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
 
-                       <CandidateDetailModal
-                           isOpen={detailModalOpen}
-                           candidate={detailEditingCandidate}
-                           phaseId={detailEditingPhase}
-                           onUpdate={updateCandidate}
-                           onClose={() => {
-                               setDetailModalOpen(false);
-                               setDetailEditingCandidate(null);
-                               setDetailEditingPhase(null);
-                           }}
-                       />
-                   </div>
-               );
-           }
+                        <CandidateDetailModal
+                            isOpen={detailModalOpen}
+                            candidate={detailEditingCandidate}
+                            phaseId={detailEditingPhase}
+                            onUpdate={updateCandidate}
+                            onClose={() => {
+                                setDetailModalOpen(false);
+                                setDetailEditingCandidate(null);
+                                setDetailEditingPhase(null);
+                            }}
+                        />
+                    </div>
+                );
+            }
 
-           // メイン画面表示
-           return (
-               <div className="p-6 bg-gray-100 min-h-screen">
-                   <div className="flex items-center justify-between mb-6">
-                       <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理</h1>
-                       <button
-                           onClick={() => setShowAddPosition(true)}
-                           className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                       >
-                           <Plus />
-                           <span>新規ポジション追加</span>
-                       </button>
-                   </div>
+            // メイン画面表示
+            return (
+                <div className="p-6 bg-gray-100 min-h-screen">
+                    <div className="flex items-center justify-between mb-6">
+                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理</h1>
+                        <button
+                            onClick={() => setShowAddPosition(true)}
+                            className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                        >
+                            <Plus />
+                            <span>新規ポジション追加</span>
+                        </button>
+                    </div>
 
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                       {positions.map((position) => {
-                           const stats = getPositionStats(position);
-                           const isEditing = editingPosition === position.id;
-                           
-                           return (
-                               <div key={position.id} className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow relative">
-                                   <div className="absolute top-4 right-4">
-                                       <button
-                                           onClick={(e) => {
-                                               e.stopPropagation();
-                                               setEditingPosition(prev => prev === position.id ? null : position.id);
-                                           }}
-                                           className="text-gray-400 hover:text-gray-600 p-1"
-                                       >
-                                           <MoreHorizontal />
-                                       </button>
-                                   </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {positions.map((position) => {
+                            const stats = getPositionStats(position);
+                            const isEditing = editingPosition === position.id;
+                            
+                            return (
+                                <div key={position.id} className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow relative">
+                                    <div className="absolute top-4 right-4">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingPosition(prev => prev === position.id ? null : position.id);
+                                            }}
+                                            className="text-gray-400 hover:text-gray-600 p-1"
+                                        >
+                                            <MoreHorizontal />
+                                        </button>
+                                    </div>
 
-                                   <div 
-                                       className="cursor-pointer"
-                                       onClick={() => !isEditing && setSelectedPosition(position)}
-                                   >
-                                       <div className="flex items-start space-x-3 mb-4">
-                                           <div className="flex-1">
-                                               {isEditing ? (
-                                                   <div className="space-y-2">
-                                                       <input
-                                                           type="text"
-                                                           value={position.name}
-                                                           onChange={(e) => updatePosition(position.id, { name: e.target.value })}
-                                                           className="w-full font-semibold text-gray-800 border rounded px-2 py-1"
-                                                           onClick={(e) => e.stopPropagation()}
-                                                       />
-                                                       <input
-                                                           type="text"
-                                                           value={position.department}
-                                                           onChange={(e) => updatePosition(position.id, { department: e.target.value })}
-                                                           className="w-full text-sm text-gray-600 border rounded px-2 py-1"
-                                                           onClick={(e) => e.stopPropagation()}
-                                                       />
-                                                       <input
-                                                           type="text"
-                                                           value={position.hiringManager}
-                                                           onChange={(e) => updatePosition(position.id, { hiringManager: e.target.value })}
-                                                           className="w-full text-sm text-gray-600 border rounded px-2 py-1"
-                                                           placeholder="採用責任者を入力"
-                                                           onClick={(e) => e.stopPropagation()}
-                                                       />
-                                                       <select
-                                                           value={position.hiringAttribute}
-                                                           onChange={(e) => updatePosition(position.id, { hiringAttribute: e.target.value })}
-                                                           className="w-full text-sm text-gray-600 border rounded px-2 py-1"
-                                                           onClick={(e) => e.stopPropagation()}
-                                                       >
-                                                           {HIRING_ATTRIBUTES.map(attr => (
-                                                               <option key={attr.value} value={attr.value}>
-                                                                   {attr.label}
-                                                               </option>
-                                                           ))}
-                                                       </select>
-                                                       <div className="flex space-x-2">
-                                                           <button
-                                                               onClick={(e) => {
-                                                                   e.stopPropagation();
-                                                                   setEditingPosition(null);
-                                                               }}
-                                                               className="text-xs bg-green-500 text-white px-2 py-1 rounded"
-                                                           >
-                                                               保存
-                                                           </button>
-                                                           <button
-                                                               onClick={(e) => {
-                                                                   e.stopPropagation();
-                                                                   if (confirm('このポジションを削除しますか？')) {
-                                                                       deletePosition(position.id);
-                                                                   }
-                                                               }}
-                                                               className="text-xs bg-red-500 text-white px-2 py-1 rounded"
-                                                           >
-                                                               削除
-                                                           </button>
-                                                       </div>
-                                                   </div>
-                                               ) : (
-                                                   <div>
-                                                       <h3 className="font-semibold text-gray-800 mb-1">{position.name}</h3>
-                                                       <p className="text-sm text-gray-600 mb-1">{position.department}</p>
-                                                       <div className="text-xs text-gray-500 mb-1">
-                                                           <span className="font-medium">責任者:</span> {position.hiringManager || '未設定'}
-                                                       </div>
-                                                       <div className="text-xs text-gray-500">
-                                                           <span className="font-medium">属性:</span> {HIRING_ATTRIBUTES.find(a => a.value === position.hiringAttribute)?.label}
-                                                       </div>
-                                                   </div>
-                                               )}
-                                           </div>
-                                       </div>
-                                   </div>
-                                   
-                                   {!isEditing && (
-                                       <div className="space-y-3">
-                                           <div className="grid grid-cols-5 gap-2 text-center">
-                                               <div>
-                                                   <div className="text-lg font-bold text-blue-600">{stats.totalCandidates}</div>
-                                                   <div className="text-xs text-gray-500">総候補者</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-pink-600">{stats.applicationCount}</div>
-                                                   <div className="text-xs text-gray-500">応募</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-blue-600">{stats.screeningCount}</div>
-                                                   <div className="text-xs text-gray-500">書類選考</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-orange-600">{stats.interview1Count}</div>
-                                                   <div className="text-xs text-gray-500">一次面接</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-purple-600">{stats.interview2Count}</div>
-                                                   <div className="text-xs text-gray-500">二次面接</div>
-                                               </div>
-                                           </div>
-                                           <div className="grid grid-cols-5 gap-2 text-center">
-                                               <div>
-                                                   <div className="text-lg font-bold text-indigo-600">{stats.finalCount}</div>
-                                                   <div className="text-xs text-gray-500">最終面接</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-green-600">{stats.offerCount}</div>
-                                                   <div className="text-xs text-gray-500">内定</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-emerald-600">{stats.hiredCount}</div>
-                                                   <div className="text-xs text-gray-500">採用決定</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-orange-600">{stats.declinedCount}</div>
-                                                   <div className="text-xs text-gray-500">辞退</div>
-                                               </div>
-                                               <div>
-                                                   <div className="text-lg font-bold text-red-600">{stats.rejectedCount}</div>
-                                                   <div className="text-xs text-gray-500">不合格</div>
-                                               </div>
-                                           </div>
-                                       </div>
-                                   )}
-                               </div>
-                           );
-                       })}
-                   </div>
+                                    <div 
+                                        className="cursor-pointer"
+                                        onClick={() => !isEditing && setSelectedPosition(position)}
+                                    >
+                                        <div className="flex items-start space-x-3 mb-4">
+                                            <div className="flex-1">
+                                                {isEditing ? (
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            value={position.name}
+                                                            onChange={(e) => updatePosition(position.id, { name: e.target.value })}
+                                                            className="w-full font-semibold text-gray-800 border rounded px-2 py-1"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={position.department}
+                                                            onChange={(e) => updatePosition(position.id, { department: e.target.value })}
+                                                            className="w-full text-sm text-gray-600 border rounded px-2 py-1"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={position.hiringManager}
+                                                            onChange={(e) => updatePosition(position.id, { hiringManager: e.target.value })}
+                                                            className="w-full text-sm text-gray-600 border rounded px-2 py-1"
+                                                            placeholder="採用責任者を入力"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <select
+                                                            value={position.hiringAttribute}
+                                                            onChange={(e) => updatePosition(position.id, { hiringAttribute: e.target.value })}
+                                                            className="w-full text-sm text-gray-600 border rounded px-2 py-1"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            {HIRING_ATTRIBUTES.map(attr => (
+                                                                <option key={attr.value} value={attr.value}>
+                                                                    {attr.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <div className="flex space-x-2">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingPosition(null);
+                                                                }}
+                                                                className="text-xs bg-green-500 text-white px-2 py-1 rounded"
+                                                            >
+                                                                保存
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (confirm('このポジションを削除しますか？')) {
+                                                                        deletePosition(position.id);
+                                                                    }
+                                                                }}
+                                                                className="text-xs bg-red-500 text-white px-2 py-1 rounded"
+                                                            >
+                                                                削除
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <h3 className="font-semibold text-gray-800 mb-1">{position.name}</h3>
+                                                        <p className="text-sm text-gray-600 mb-1">{position.department}</p>
+                                                        <div className="text-xs text-gray-500 mb-1">
+                                                            <span className="font-medium">責任者:</span> {position.hiringManager || '未設定'}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            <span className="font-medium">属性:</span> {HIRING_ATTRIBUTES.find(a => a.value === position.hiringAttribute)?.label}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {!isEditing && (
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-5 gap-2 text-center">
+                                                <div>
+                                                    <div className="text-lg font-bold text-blue-600">{stats.totalCandidates}</div>
+                                                    <div className="text-xs text-gray-500">総候補者</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-pink-600">{stats.applicationCount}</div>
+                                                    <div className="text-xs text-gray-500">応募</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-blue-600">{stats.screeningCount}</div>
+                                                    <div className="text-xs text-gray-500">書類選考</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-orange-600">{stats.interview1Count}</div>
+                                                    <div className="text-xs text-gray-500">一次面接</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-purple-600">{stats.interview2Count}</div>
+                                                    <div className="text-xs text-gray-500">二次面接</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-5 gap-2 text-center">
+                                                <div>
+                                                    <div className="text-lg font-bold text-indigo-600">{stats.finalCount}</div>
+                                                    <div className="text-xs text-gray-500">最終面接</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-green-600">{stats.offerCount}</div>
+                                                    <div className="text-xs text-gray-500">内定</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-emerald-600">{stats.hiredCount}</div>
+                                                    <div className="text-xs text-gray-500">採用決定</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-orange-600">{stats.declinedCount}</div>
+                                                    <div className="text-xs text-gray-500">辞退</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-bold text-red-600">{stats.rejectedCount}</div>
+                                                    <div className="text-xs text-gray-500">不合格</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
 
-                   <AddPositionModal
-                       isOpen={showAddPosition}
-                       newPosition={newPosition}
-                       onPositionChange={setNewPosition}
-                       onAdd={addPosition}
-                       onCancel={() => setShowAddPosition(false)}
-                   />
-               </div>
-           );
-       };
+                    <AddPositionModal
+                        isOpen={showAddPosition}
+                        newPosition={newPosition}
+                        onPositionChange={setNewPosition}
+                        onAdd={addPosition}
+                        onCancel={() => setShowAddPosition(false)}
+                    />
+                </div>
+            );
+        };
 
-       // メインアプリ
-       const App = () => {
-           const [isAuthenticated, setIsAuthenticated] = useState(() => {
-               return localStorage.getItem('authenticated') === 'true';
-           });
+        // メインアプリ
+        const App = () => {
+            const [isAuthenticated, setIsAuthenticated] = useState(() => {
+                try {
+                    return localStorage.getItem('authenticated') === 'true';
+                } catch {
+                    return false;
+                }
+            });
 
-           const handleLogin = () => {
-               setIsAuthenticated(true);
-               localStorage.setItem('authenticated', 'true');
-           };
+            const handleLogin = () => {
+                setIsAuthenticated(true);
+                try {
+                    localStorage.setItem('authenticated', 'true');
+                } catch (error) {
+                    console.error('Failed to save authentication state:', error);
+                }
+            };
 
-           const handleLogout = () => {
-               setIsAuthenticated(false);
-               localStorage.removeItem('authenticated');
-           };
+            const handleLogout = () => {
+                setIsAuthenticated(false);
+                try {
+                    localStorage.removeItem('authenticated');
+                } catch (error) {
+                    console.error('Failed to remove authentication state:', error);
+                }
+            };
 
-           if (!isAuthenticated) {
-               return <LoginComponent onLogin={handleLogin} />;
-           }
+            if (!isAuthenticated) {
+                return <LoginComponent onLogin={handleLogin} />;
+            }
 
-           return (
-               <div>
-                   <div className="absolute top-4 right-4 z-50">
-                       <button 
-                           onClick={handleLogout}
-                           className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm"
-                       >
-                           ログアウト
-                       </button>
-                   </div>
-                   <RecruitmentSystem />
-               </div>
-           );
-       };
+            return (
+                <div>
+                    <div className="absolute top-4 right-4 z-50">
+                        <button 
+                            onClick={handleLogout}
+                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm"
+                        >
+                            ログアウト
+                        </button>
+                    </div>
+                    <RecruitmentSystem />
+                </div>
+            );
+        };
 
-       ReactDOM.render(<App />, document.getElementById('root'));
-   </script>
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
 </body>
 </html>
-                        
