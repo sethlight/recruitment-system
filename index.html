@@ -86,6 +86,14 @@
             </svg>
         );
 
+        const History = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <path d="M12 7v5l4 2"/>
+            </svg>
+        );
+
         // フィールドタイプの定数
         const FIELD_TYPES = [
             { value: 'text', label: 'テキスト' },
@@ -682,6 +690,7 @@
             customFields: candidate?.customFields || {}
           });
           const [showFieldManager, setShowFieldManager] = useState(false);
+          const [showHistory, setShowHistory] = useState(false);
           const [newQuickField, setNewQuickField] = useState({ name: '', type: 'text', required: false });
 
           useEffect(() => {
@@ -749,20 +758,139 @@
             onClose();
           };
 
+          // フェーズ名を取得する関数
+          const getPhaseName = (phaseId) => {
+            if (!phaseId) return '新規登録';
+            const phase = position.phases.find(p => p.id === phaseId);
+            return phase ? phase.name : '不明なフェーズ';
+          };
+
+          // フェーズの色を取得する関数
+          const getPhaseColor = (phaseId) => {
+            if (!phaseId) return 'bg-gray-500';
+            const phase = position.phases.find(p => p.id === phaseId);
+            return phase ? phase.color : 'bg-gray-500';
+          };
+
           return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">候補者詳細編集</h3>
-                  <button
-                    onClick={() => setShowFieldManager(!showFieldManager)}
-                    className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded border"
-                  >
-                    {showFieldManager ? '📝 入力画面' : '⚙️ フィールド管理'}
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        setShowFieldManager(false);
+                        setShowHistory(!showHistory);
+                      }}
+                      className={`text-sm px-3 py-1 rounded border ${
+                        showHistory ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >
+                      {showHistory ? '📋 編集画面' : '📊 移動履歴'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowHistory(false);
+                        setShowFieldManager(!showFieldManager);
+                      }}
+                      className={`text-sm px-3 py-1 rounded border ${
+                        showFieldManager ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >
+                      {showFieldManager ? '📝 入力画面' : '⚙️ フィールド管理'}
+                    </button>
+                  </div>
                 </div>
 
-                {showFieldManager ? (
+                {showHistory ? (
+                  // 移動履歴画面
+                  <div className="space-y-4">
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-3 text-green-800 flex items-center space-x-2">
+                        <History />
+                        <span>📊 フェーズ移動履歴 - {candidate.name}さん</span>
+                      </h4>
+                      
+                      {(!candidate.phaseHistory || candidate.phaseHistory.length === 0) && (
+                        <div className="text-center py-8 text-gray-500">
+                          <p className="text-sm">まだ移動履歴がありません</p>
+                        </div>
+                      )}
+
+                      {candidate.phaseHistory && candidate.phaseHistory.length > 0 && (
+                        <div className="space-y-3">
+                          {candidate.phaseHistory.slice().reverse().map((history, index) => (
+                            <div key={index} className="bg-white p-4 rounded-lg border-l-4 border-green-400">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-3">
+                                  {history.action === 'created' ? (
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                      <span className="font-medium text-green-700">✨ 新規登録</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                      <span className="font-medium text-blue-700">🔄 フェーズ移動</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(history.timestamp).toLocaleString('ja-JP', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                              
+                              <div className="flex items-center space-x-3">
+                                {history.action === 'created' ? (
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`px-3 py-1 rounded-full text-xs font-medium text-white ${getPhaseColor(history.toPhase)}`}>
+                                      {getPhaseName(history.toPhase)}
+                                    </div>
+                                    <span className="text-sm text-gray-600">に登録されました</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`px-3 py-1 rounded-full text-xs font-medium text-white ${getPhaseColor(history.fromPhase)}`}>
+                                      {getPhaseName(history.fromPhase)}
+                                    </div>
+                                    <span className="text-gray-400">→</span>
+                                    <div className={`px-3 py-1 rounded-full text-xs font-medium text-white ${getPhaseColor(history.toPhase)}`}>
+                                      {getPhaseName(history.toPhase)}
+                                    </div>
+                                    <span className="text-sm text-gray-600">に移動</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 text-blue-800">📈 統計情報</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">総移動回数:</span>
+                          <span className="ml-2">{(candidate.phaseHistory?.length || 1) - 1}回</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">滞在期間:</span>
+                          <span className="ml-2">
+                            {Math.floor((new Date() - new Date(candidate.createdAt)) / (1000 * 60 * 60 * 24))}日
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : showFieldManager ? (
                   // フィールド管理画面
                   <div className="space-y-4">
                     <div className="bg-blue-50 p-4 rounded-lg">
@@ -927,7 +1055,7 @@
                   >
                     キャンセル
                   </button>
-                  {!showFieldManager && (
+                  {!showFieldManager && !showHistory && (
                     <button
                       onClick={handleSave}
                       className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -1336,7 +1464,13 @@
                     notes: '',
                     customFields: {},
                     createdAt: new Date().toISOString(),
-                    lastUpdated: new Date().toISOString()
+                    lastUpdated: new Date().toISOString(),
+                    phaseHistory: [{
+                        fromPhase: null,
+                        toPhase: phaseId,
+                        timestamp: new Date().toISOString(),
+                        action: 'created'
+                    }]
                 };
 
                 const updatedPositions = positions.map(position => {
@@ -1401,7 +1535,16 @@
                 // 移動時に最新の日時を更新
                 const updatedCandidate = {
                     ...candidate,
-                    lastUpdated: new Date().toISOString()
+                    lastUpdated: new Date().toISOString(),
+                    phaseHistory: [
+                        ...(candidate.phaseHistory || []),
+                        {
+                            fromPhase: fromPhaseId,
+                            toPhase: toPhaseId,
+                            timestamp: new Date().toISOString(),
+                            action: 'moved'
+                        }
+                    ]
                 };
 
                 const updatedPositions = positions.map(pos => {
