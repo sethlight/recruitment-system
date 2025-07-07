@@ -417,7 +417,7 @@
             };
 
             return (
-                <div className="fixed top-4 left-4 z-50">
+                <div className="fixed bottom-4 left-4 z-50">
                     <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm ${getStatusColor()}`}>
                         {status.isOnline ? <Wifi /> : <WifiOff />}
                         <span>{getStatusText()}</span>
@@ -1139,21 +1139,23 @@
                         
                         <div className="mb-6">
                             <div className="flex items-center justify-between mb-4">
-                                <BackButton 
-                                    navigationHistory={navigationHistory}
-                                    onBack={handleBackNavigation}
-                                />
-                                <button
-                                    onClick={() => {
-                                        setSelectedPosition(null);
-                                        setSelectedCandidate(null);
-                                        navigationHistory.clear();
-                                    }}
-                                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
-                                >
-                                    <ArrowLeft />
-                                    <span>ポジション一覧に戻る</span>
-                                </button>
+                                <div className="flex items-center space-x-4">
+                                    <BackButton 
+                                        navigationHistory={navigationHistory}
+                                        onBack={handleBackNavigation}
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            setSelectedPosition(null);
+                                            setSelectedCandidate(null);
+                                            navigationHistory.clear();
+                                        }}
+                                        className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+                                    >
+                                        <ArrowLeft />
+                                        <span>ポジション一覧に戻る</span>
+                                    </button>
+                                </div>
                             </div>
                             <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
                             <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
@@ -1253,7 +1255,7 @@
                         lastUpdate={lastUpdate} 
                     />
                     
-                    <div className="flex items-center justify-between mb-6 mt-16">
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center space-x-4">
                             <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（チーム共有版）</h1>
                             <BackButton 
