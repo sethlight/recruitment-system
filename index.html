@@ -1138,14 +1138,14 @@
                         />
                         
                         <div className="mb-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <BackButton 
-                                    navigationHistory={navigationHistory}
-                                    onBack={handleBackNavigation}
-                                />
+                            <BackButton 
+                                navigationHistory={navigationHistory}
+                                onBack={handleBackNavigation}
+                            />
+                            <div className="mt-4">
+                                <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
+                                <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
                             </div>
-                            <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
-                            <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
                         </div>
 
                         <div className="flex gap-4 overflow-x-auto pb-4">
