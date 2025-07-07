@@ -76,6 +76,13 @@
             </svg>
         );
 
+        const RotateCcw = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+            </svg>
+        );
+
         const Wifi = () => (
             <svg className="lucide" viewBox="0 0 24 24">
                 <path d="m1 9 4-4 4 4"/>
@@ -116,6 +123,66 @@
           { id: 'declined', name: '辞退', color: 'bg-orange-500' },
           { id: 'rejected', name: '不合格', color: 'bg-red-500' }
         ];
+
+        // ナビゲーション履歴管理
+        class NavigationHistory {
+            constructor() {
+                this.history = this.loadHistory();
+            }
+
+            loadHistory() {
+                try {
+                    const saved = localStorage.getItem('navigation-history');
+                    return saved ? JSON.parse(saved) : [];
+                } catch {
+                    return [];
+                }
+            }
+
+            saveHistory() {
+                try {
+                    localStorage.setItem('navigation-history', JSON.stringify(this.history));
+                } catch (error) {
+                    console.error('Failed to save navigation history:', error);
+                }
+            }
+
+            push(route) {
+                // 重複を避けるため、同じルートは削除してから追加
+                this.history = this.history.filter(item => 
+                    !(item.type === route.type && item.id === route.id)
+                );
+                this.history.push({
+                    ...route,
+                    timestamp: Date.now()
+                });
+                
+                // 履歴を最大10件に制限
+                if (this.history.length > 10) {
+                    this.history = this.history.slice(-10);
+                }
+                
+                this.saveHistory();
+            }
+
+            pop() {
+                if (this.history.length > 0) {
+                    const lastRoute = this.history.pop();
+                    this.saveHistory();
+                    return lastRoute;
+                }
+                return null;
+            }
+
+            getCurrentRoute() {
+                return this.history.length > 0 ? this.history[this.history.length - 1] : null;
+            }
+
+            clear() {
+                this.history = [];
+                this.saveHistory();
+            }
+        }
 
         // データベース操作クラス
         class DatabaseManager {
@@ -280,6 +347,47 @@
             }
         }
 
+        // 戻るボタンコンポーネント
+        const BackButton = ({ navigationHistory, onBack }) => {
+            const [canGoBack, setCanGoBack] = useState(false);
+            const [lastRoute, setLastRoute] = useState(null);
+
+            useEffect(() => {
+                const currentRoute = navigationHistory.getCurrentRoute();
+                const hasHistory = navigationHistory.history.length > 1;
+                
+                setCanGoBack(hasHistory);
+                if (hasHistory && navigationHistory.history.length >= 2) {
+                    setLastRoute(navigationHistory.history[navigationHistory.history.length - 2]);
+                }
+            }, [navigationHistory]);
+
+            if (!canGoBack) return null;
+
+            const getBackButtonText = () => {
+                if (!lastRoute) return '前の画面に戻る';
+                
+                switch (lastRoute.type) {
+                    case 'position-list':
+                        return 'ポジション一覧に戻る';
+                    case 'position-detail':
+                        return `${lastRoute.name || '詳細画面'}に戻る`;
+                    default:
+                        return '前の画面に戻る';
+                }
+            };
+
+            return (
+                <button
+                    onClick={onBack}
+                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 transition-colors"
+                >
+                    <RotateCcw />
+                    <span className="text-sm">{getBackButtonText()}</span>
+                </button>
+            );
+        };
+
         // 接続ステータス表示コンポーネント
         const ConnectionStatus = ({ dbManager, dataSource, lastUpdate }) => {
             const [status, setStatus] = useState(dbManager.getConnectionStatus());
@@ -330,7 +438,7 @@
             
             const handleSubmit = (e) => {
                 e.preventDefault();
-                if (password === 'salowin2024') {
+                if (password === 'sarowin2024') {
                     onLogin();
                 } else {
                     alert('パスワードが正しくありません');
@@ -710,6 +818,7 @@
         // 採用管理システム
         const RecruitmentSystem = () => {
             const [dbManager] = useState(() => new DatabaseManager());
+            const [navigationHistory] = useState(() => new NavigationHistory());
             const [positions, setPositions] = useState([]);
             const [dataSource, setDataSource] = useState(null);
             const [lastUpdate, setLastUpdate] = useState(null);
@@ -770,6 +879,52 @@
 
                 return () => clearInterval(interval);
             }, [dbManager, lastUpdate]);
+
+            // ナビゲーション管理
+            const handlePositionSelect = useCallback((position) => {
+                // 現在の一覧状態を履歴に保存
+                navigationHistory.push({
+                    type: 'position-list',
+                    name: 'ポジション一覧'
+                });
+                
+                // 選択されたポジションの詳細を履歴に保存
+                navigationHistory.push({
+                    type: 'position-detail',
+                    id: position.id,
+                    name: position.name
+                });
+                
+                setSelectedPosition(position);
+                setSelectedCandidate(null);
+            }, [navigationHistory]);
+
+            const handleBackNavigation = useCallback(() => {
+                const lastRoute = navigationHistory.pop(); // 現在のルートを削除
+                const previousRoute = navigationHistory.getCurrentRoute(); // 前のルートを取得
+                
+                if (previousRoute) {
+                    if (previousRoute.type === 'position-list') {
+                        setSelectedPosition(null);
+                        setSelectedCandidate(null);
+                    } else if (previousRoute.type === 'position-detail') {
+                        // 特定のポジション詳細に戻る場合
+                        const position = positions.find(p => p.id === previousRoute.id);
+                        if (position) {
+                            setSelectedPosition(position);
+                            setSelectedCandidate(null);
+                        } else {
+                            // ポジションが見つからない場合は一覧に戻る
+                            setSelectedPosition(null);
+                            setSelectedCandidate(null);
+                        }
+                    }
+                } else {
+                    // 履歴がない場合は一覧に戻る
+                    setSelectedPosition(null);
+                    setSelectedCandidate(null);
+                }
+            }, [navigationHistory, positions]);
 
             // 候補者選択
             const handleCandidateClick = useCallback((candidate) => {
@@ -983,16 +1138,23 @@
                         />
                         
                         <div className="mb-6">
-                            <button
-                                onClick={() => {
-                                    setSelectedPosition(null);
-                                    setSelectedCandidate(null);
-                                }}
-                                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
-                            >
-                                <ArrowLeft />
-                                <span>ポジション一覧に戻る</span>
-                            </button>
+                            <div className="flex items-center justify-between mb-4">
+                                <BackButton 
+                                    navigationHistory={navigationHistory}
+                                    onBack={handleBackNavigation}
+                                />
+                                <button
+                                    onClick={() => {
+                                        setSelectedPosition(null);
+                                        setSelectedCandidate(null);
+                                        navigationHistory.clear();
+                                    }}
+                                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+                                >
+                                    <ArrowLeft />
+                                    <span>ポジション一覧に戻る</span>
+                                </button>
+                            </div>
                             <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
                             <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
                         </div>
@@ -1092,7 +1254,13 @@
                     />
                     
                     <div className="flex items-center justify-between mb-6 mt-16">
-                        <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（チーム共有版）</h1>
+                        <div className="flex items-center space-x-4">
+                            <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（チーム共有版）</h1>
+                            <BackButton 
+                                navigationHistory={navigationHistory}
+                                onBack={handleBackNavigation}
+                            />
+                        </div>
                         <button
                             onClick={() => setShowAddPosition(true)}
                             className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -1123,7 +1291,7 @@
 
                                     <div 
                                         className="cursor-pointer"
-                                        onClick={() => !isEditing && setSelectedPosition(position)}
+                                        onClick={() => !isEditing && handlePositionSelect(position)}
                                     >
                                         <div className="flex items-start space-x-3 mb-4">
                                             <div className="flex-1">
