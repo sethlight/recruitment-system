@@ -1009,12 +1009,60 @@
           onDeleteCandidate,
           selectedCandidate,
           onCandidateClick,
-          onOpenDetail
+          onOpenDetail,
+          phases
         }) => {
           const [showMenu, setShowMenu] = useState(false);
           const [isEditing, setIsEditing] = useState(false);
           const [showAllFields, setShowAllFields] = useState(false);
           const isSelected = selectedCandidate?.id === candidate.id;
+
+          // クイック移動ボタンの表示制御
+          const getQuickMoveButtons = () => {
+            const buttons = [];
+            
+            // 現在のフェーズに応じて適切なボタンを表示
+            const offerPhase = phases.find(p => p.id === 'offer' || p.name.includes('内定'));
+            const hiredPhase = phases.find(p => p.id === 'hired' || p.name.includes('採用決定'));
+            const declinedPhase = phases.find(p => p.id === 'declined' || p.name.includes('辞退'));
+            const rejectedPhase = phases.find(p => p.id === 'rejected' || p.name.includes('不合格'));
+
+            if (offerPhase && phaseId !== offerPhase.id) {
+              buttons.push({
+                label: offerPhase.name,
+                phaseId: offerPhase.id,
+                color: 'bg-green-500 hover:bg-green-600'
+              });
+            }
+
+            if (hiredPhase && phaseId !== hiredPhase.id) {
+              buttons.push({
+                label: hiredPhase.name,
+                phaseId: hiredPhase.id,
+                color: 'bg-emerald-500 hover:bg-emerald-600'
+              });
+            }
+
+            if (declinedPhase && phaseId !== declinedPhase.id) {
+              buttons.push({
+                label: declinedPhase.name,
+                phaseId: declinedPhase.id,
+                color: 'bg-orange-500 hover:bg-orange-600'
+              });
+            }
+
+            if (rejectedPhase && phaseId !== rejectedPhase.id) {
+              buttons.push({
+                label: rejectedPhase.name,
+                phaseId: rejectedPhase.id,
+                color: 'bg-red-500 hover:bg-red-600'
+              });
+            }
+
+            return buttons;
+          };
+
+          const quickMoveButtons = getQuickMoveButtons();
 
           return (
             <div 
@@ -1155,44 +1203,22 @@
                 </div>
               )}
 
-              <div className="flex items-center space-x-1 flex-wrap gap-1 mb-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'offer');
-                  }}
-                  className="text-xs bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded"
-                >
-                  内定
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'hired');
-                  }}
-                  className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded"
-                >
-                  採用
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'declined');
-                  }}
-                  className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded"
-                >
-                  辞退
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveCandidate(candidate.id, phaseId, 'rejected');
-                  }}
-                  className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded"
-                >
-                  不合格
-                </button>
-              </div>
+              {quickMoveButtons.length > 0 && (
+                <div className="flex items-center space-x-1 flex-wrap gap-1 mb-2">
+                  {quickMoveButtons.map((button) => (
+                    <button
+                      key={button.phaseId}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoveCandidate(candidate.id, phaseId, button.phaseId);
+                      }}
+                      className={`text-xs ${button.color} text-white px-2 py-1 rounded`}
+                    >
+                      {button.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-xs text-gray-400">
                 <div className="flex items-center">
@@ -1548,7 +1574,7 @@
                 setSelectedCandidate(null);
             }, [selectedPosition, positions, saveData]);
 
-            // フェーズを更新
+            // フェーズを更新（ポジション個別）
             const updatePhases = useCallback((updatedPhases) => {
                 if (!selectedPosition) return;
 
@@ -1612,30 +1638,32 @@
                 }
             }, [positions, selectedPosition, saveData]);
 
+            // ポジションの統計を取得（動的にフェーズを処理）
             const getPositionStats = (position) => {
-                const totalCandidates = position.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
-                const applicationCount = position.phases.find(p => p.id === 'application')?.candidates.length || 0;
-                const screeningCount = position.phases.find(p => p.id === 'screening')?.candidates.length || 0;
-                const interview1Count = position.phases.find(p => p.id === 'interview1')?.candidates.length || 0;
-                const interview2Count = position.phases.find(p => p.id === 'interview2')?.candidates.length || 0;
-                const finalCount = position.phases.find(p => p.id === 'final')?.candidates.length || 0;
-                const offerCount = position.phases.find(p => p.id === 'offer')?.candidates.length || 0;
-                const hiredCount = position.phases.find(p => p.id === 'hired')?.candidates.length || 0;
-                const declinedCount = position.phases.find(p => p.id === 'declined')?.candidates.length || 0;
-                const rejectedCount = position.phases.find(p => p.id === 'rejected')?.candidates.length || 0;
-                
-                return { 
-                  totalCandidates, 
-                  applicationCount,
-                  screeningCount,
-                  interview1Count,
-                  interview2Count,
-                  finalCount,
-                  offerCount,
-                  hiredCount, 
-                  declinedCount, 
-                  rejectedCount 
+                const stats = {
+                    totalCandidates: 0,
+                    phaseStats: []
                 };
+
+                // 最初の10個のフェーズの統計を収集
+                position.phases.slice(0, 10).forEach(phase => {
+                    const count = phase.candidates.length;
+                    stats.totalCandidates += count;
+                    stats.phaseStats.push({
+                        id: phase.id,
+                        name: phase.name,
+                        count: count,
+                        color: phase.color
+                    });
+                });
+
+                // 10個以上のフェーズがある場合は、残りの候補者数を合計
+                if (position.phases.length > 10) {
+                    const remainingCount = position.phases.slice(10).reduce((sum, phase) => sum + phase.candidates.length, 0);
+                    stats.totalCandidates += remainingCount;
+                }
+
+                return stats;
             };
 
             // カンバンボード表示
@@ -1713,6 +1741,7 @@
                                                 onUpdateCandidate={updateCandidate}
                                                 onMoveCandidate={moveCandidate}
                                                 onDeleteCandidate={deleteCandidate}
+                                                phases={selectedPosition.phases}
                                             />
                                         ))}
                                         {phase.candidates.length === 0 && (
@@ -1888,50 +1917,56 @@
                                     
                                     {!isEditing && (
                                         <div className="space-y-3">
-                                            <div className="grid grid-cols-5 gap-2 text-center">
-                                                <div>
-                                                    <div className="text-lg font-bold text-blue-600">{stats.totalCandidates}</div>
-                                                    <div className="text-xs text-gray-500">総候補者</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-pink-600">{stats.applicationCount}</div>
-                                                    <div className="text-xs text-gray-500">応募</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-blue-600">{stats.screeningCount}</div>
-                                                    <div className="text-xs text-gray-500">書類選考</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-orange-600">{stats.interview1Count}</div>
-                                                    <div className="text-xs text-gray-500">一次面接</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-purple-600">{stats.interview2Count}</div>
-                                                    <div className="text-xs text-gray-500">二次面接</div>
-                                                </div>
+                                            <div className="text-center mb-2">
+                                                <div className="text-2xl font-bold text-blue-600">{stats.totalCandidates}</div>
+                                                <div className="text-sm text-gray-500">総候補者数</div>
                                             </div>
                                             <div className="grid grid-cols-5 gap-2 text-center">
-                                                <div>
-                                                    <div className="text-lg font-bold text-indigo-600">{stats.finalCount}</div>
-                                                    <div className="text-xs text-gray-500">最終面接</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-green-600">{stats.offerCount}</div>
-                                                    <div className="text-xs text-gray-500">内定</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-emerald-600">{stats.hiredCount}</div>
-                                                    <div className="text-xs text-gray-500">採用決定</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-orange-600">{stats.declinedCount}</div>
-                                                    <div className="text-xs text-gray-500">辞退</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-red-600">{stats.rejectedCount}</div>
-                                                    <div className="text-xs text-gray-500">不合格</div>
-                                                </div>
+                                                {stats.phaseStats.slice(0, 5).map((phase) => (
+                                                    <div key={phase.id}>
+                                                        <div className={`text-lg font-bold ${
+                                                            phase.color.includes('pink') ? 'text-pink-600' :
+                                                            phase.color.includes('blue') ? 'text-blue-600' :
+                                                            phase.color.includes('orange') ? 'text-orange-600' :
+                                                            phase.color.includes('purple') ? 'text-purple-600' :
+                                                            phase.color.includes('indigo') ? 'text-indigo-600' :
+                                                            phase.color.includes('green') ? 'text-green-600' :
+                                                            phase.color.includes('emerald') ? 'text-emerald-600' :
+                                                            phase.color.includes('red') ? 'text-red-600' :
+                                                            phase.color.includes('yellow') ? 'text-yellow-600' :
+                                                            phase.color.includes('cyan') ? 'text-cyan-600' :
+                                                            phase.color.includes('gray') ? 'text-gray-600' :
+                                                            phase.color.includes('teal') ? 'text-teal-600' :
+                                                            'text-gray-600'
+                                                        }`}>{phase.count}</div>
+                                                        <div className="text-xs text-gray-500 truncate">{phase.name}</div>
+                                                    </div>
+                                                ))}
                                             </div>
+                                            {stats.phaseStats.length > 5 && (
+                                                <div className="grid grid-cols-5 gap-2 text-center">
+                                                    {stats.phaseStats.slice(5, 10).map((phase) => (
+                                                        <div key={phase.id}>
+                                                            <div className={`text-lg font-bold ${
+                                                                phase.color.includes('pink') ? 'text-pink-600' :
+                                                                phase.color.includes('blue') ? 'text-blue-600' :
+                                                                phase.color.includes('orange') ? 'text-orange-600' :
+                                                                phase.color.includes('purple') ? 'text-purple-600' :
+                                                                phase.color.includes('indigo') ? 'text-indigo-600' :
+                                                                phase.color.includes('green') ? 'text-green-600' :
+                                                                phase.color.includes('emerald') ? 'text-emerald-600' :
+                                                                phase.color.includes('red') ? 'text-red-600' :
+                                                                phase.color.includes('yellow') ? 'text-yellow-600' :
+                                                                phase.color.includes('cyan') ? 'text-cyan-600' :
+                                                                phase.color.includes('gray') ? 'text-gray-600' :
+                                                                phase.color.includes('teal') ? 'text-teal-600' :
+                                                                'text-gray-600'
+                                                            }`}>{phase.count}</div>
+                                                            <div className="text-xs text-gray-500 truncate">{phase.name}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
