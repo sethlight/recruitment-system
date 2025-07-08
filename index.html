@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>採用管理システム（チーム共有版）</title>
+    <title>SALOWIN ATS</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -29,7 +29,7 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useCallback, useEffect } = React;
+        const { useState, useCallback, useEffect, useMemo } = React;
 
         // アイコンコンポーネント
         const Plus = () => (
@@ -167,6 +167,27 @@
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                 <polyline points="16 17 21 12 16 7"/>
                 <line x1="21" x2="9" y1="12" y2="12"/>
+            </svg>
+        );
+
+        const Search = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+            </svg>
+        );
+
+        const Filter = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+        );
+
+        const Download = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" x2="12" y1="15" y2="3"/>
             </svg>
         );
 
@@ -433,6 +454,445 @@
                 };
             }
         }
+
+        // 候補者抽出モーダル
+        const CandidateFilterModal = ({ isOpen, positions, onClose }) => {
+            const [searchTerm, setSearchTerm] = useState('');
+            const [selectedPosition, setSelectedPosition] = useState('all');
+            const [selectedPhase, setSelectedPhase] = useState('all');
+            const [selectedAttribute, setSelectedAttribute] = useState('all');
+            const [customFieldFilters, setCustomFieldFilters] = useState([]);
+            const [filterLogic, setFilterLogic] = useState('AND');
+            const [results, setResults] = useState([]);
+            const [showResults, setShowResults] = useState(false);
+
+            // 全候補者から動的にカスタムフィールドを収集
+            const availableCustomFields = useMemo(() => {
+                const fieldsMap = new Map();
+                
+                positions.forEach(position => {
+                    position.phases.forEach(phase => {
+                        phase.candidates.forEach(candidate => {
+                            if (candidate.customFields) {
+                                candidate.customFields.forEach(field => {
+                                    if (!fieldsMap.has(field.name)) {
+                                        fieldsMap.set(field.name, new Set());
+                                    }
+                                    if (field.value) {
+                                        fieldsMap.get(field.name).add(field.value);
+                                    }
+                                });
+                            }
+                        });
+                    });
+                });
+
+                return Array.from(fieldsMap.entries()).map(([name, values]) => ({
+                    name,
+                    values: Array.from(values).sort()
+                }));
+            }, [positions]);
+
+            // フィルタ追加
+            const addCustomFieldFilter = () => {
+                setCustomFieldFilters([...customFieldFilters, {
+                    id: Date.now(),
+                    fieldName: '',
+                    operator: 'equals',
+                    value: ''
+                }]);
+            };
+
+            // フィルタ更新
+            const updateCustomFieldFilter = (id, updates) => {
+                setCustomFieldFilters(customFieldFilters.map(filter =>
+                    filter.id === id ? { ...filter, ...updates } : filter
+                ));
+            };
+
+            // フィルタ削除
+            const removeCustomFieldFilter = (id) => {
+                setCustomFieldFilters(customFieldFilters.filter(filter => filter.id !== id));
+            };
+
+            // 検索実行
+            const executeSearch = () => {
+                const filteredCandidates = [];
+
+                positions.forEach(position => {
+                    // ポジションフィルタ
+                    if (selectedPosition !== 'all' && position.id !== parseInt(selectedPosition)) {
+                        return;
+                    }
+
+                    // 採用者属性フィルタ
+                    if (selectedAttribute !== 'all' && position.hiringAttribute !== selectedAttribute) {
+                        return;
+                    }
+
+                    position.phases.forEach(phase => {
+                        // フェーズフィルタ
+                        if (selectedPhase !== 'all' && phase.id !== selectedPhase) {
+                            return;
+                        }
+
+                        phase.candidates.forEach(candidate => {
+                            let matches = true;
+
+                            // 名前検索
+                            if (searchTerm) {
+                                const searchLower = searchTerm.toLowerCase();
+                                const nameMatches = candidate.name.toLowerCase().includes(searchLower);
+                                const notesMatches = candidate.notes && candidate.notes.toLowerCase().includes(searchLower);
+                                
+                                if (!nameMatches && !notesMatches) {
+                                    matches = false;
+                                }
+                            }
+
+                            // カスタムフィールドフィルタ
+                            if (customFieldFilters.length > 0 && matches) {
+                                const filterResults = customFieldFilters.map(filter => {
+                                    if (!filter.fieldName || !filter.value) return true;
+
+                                    const field = candidate.customFields?.find(f => f.name === filter.fieldName);
+                                    if (!field) return false;
+
+                                    const fieldValue = field.value.toLowerCase();
+                                    const filterValue = filter.value.toLowerCase();
+
+                                    switch (filter.operator) {
+                                        case 'equals':
+                                            return fieldValue === filterValue;
+                                        case 'contains':
+                                            return fieldValue.includes(filterValue);
+                                        case 'startsWith':
+                                            return fieldValue.startsWith(filterValue);
+                                        case 'endsWith':
+                                            return fieldValue.endsWith(filterValue);
+                                        default:
+                                            return true;
+                                    }
+                                });
+
+                                if (filterLogic === 'AND') {
+                                    matches = filterResults.every(result => result);
+                                } else {
+                                    matches = filterResults.some(result => result);
+                                }
+                            }
+
+                            if (matches) {
+                                filteredCandidates.push({
+                                    ...candidate,
+                                    positionName: position.name,
+                                    positionId: position.id,
+                                    phaseName: phase.name,
+                                    phaseId: phase.id,
+                                    department: position.department,
+                                    hiringManager: position.hiringManager,
+                                    hiringAttribute: position.hiringAttribute
+                                });
+                            }
+                        });
+                    });
+                });
+
+                setResults(filteredCandidates);
+                setShowResults(true);
+            };
+
+            // CSV出力
+            const exportToCSV = () => {
+                if (results.length === 0) return;
+
+                // ヘッダー作成
+                const headers = ['候補者名', 'ポジション', '部署', '採用責任者', '採用者属性', 'フェーズ', 'メモ', '登録日'];
+                
+                // 動的なカスタムフィールドのヘッダーを追加
+                const allCustomFieldNames = new Set();
+                results.forEach(candidate => {
+                    if (candidate.customFields) {
+                        candidate.customFields.forEach(field => {
+                            allCustomFieldNames.add(field.name);
+                        });
+                    }
+                });
+                headers.push(...Array.from(allCustomFieldNames));
+
+                // データ行作成
+                const rows = results.map(candidate => {
+                    const row = [
+                        candidate.name,
+                        candidate.positionName,
+                        candidate.department,
+                        candidate.hiringManager || '',
+                        HIRING_ATTRIBUTES.find(a => a.value === candidate.hiringAttribute)?.label || '',
+                        candidate.phaseName,
+                        candidate.notes || '',
+                        new Date(candidate.createdAt).toLocaleDateString()
+                    ];
+
+                    // カスタムフィールドの値を追加
+                    Array.from(allCustomFieldNames).forEach(fieldName => {
+                        const field = candidate.customFields?.find(f => f.name === fieldName);
+                        row.push(field ? field.value : '');
+                    });
+
+                    return row;
+                });
+
+                // CSV文字列作成
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+                ].join('\n');
+
+                // BOM付きでダウンロード（Excel対応）
+                const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `候補者一覧_${new Date().toLocaleDateString()}.csv`;
+                link.click();
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-lg font-semibold mb-4">候補者検索・抽出</h3>
+
+                        <div className="space-y-4 mb-6">
+                            {/* 基本検索 */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    名前・メモで検索
+                                </label>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="候補者名またはメモの内容を入力"
+                                    className="w-full border rounded-lg px-3 py-2"
+                                />
+                            </div>
+
+                            {/* ポジション・フェーズフィルタ */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        ポジション
+                                    </label>
+                                    <select
+                                        value={selectedPosition}
+                                        onChange={(e) => setSelectedPosition(e.target.value)}
+                                        className="w-full border rounded-lg px-3 py-2"
+                                    >
+                                        <option value="all">すべて</option>
+                                        {positions.map(position => (
+                                            <option key={position.id} value={position.id}>
+                                                {position.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        フェーズ
+                                    </label>
+                                    <select
+                                        value={selectedPhase}
+                                        onChange={(e) => setSelectedPhase(e.target.value)}
+                                        className="w-full border rounded-lg px-3 py-2"
+                                    >
+                                        <option value="all">すべて</option>
+                                        {selectedPosition !== 'all' ? (
+                                            positions.find(p => p.id === parseInt(selectedPosition))?.phases.map(phase => (
+                                                <option key={phase.id} value={phase.id}>
+                                                    {phase.name}
+                                                </option>
+                                            ))
+                                        ) : (
+                                            // 全ポジションから重複を除いたフェーズリスト
+                                            Array.from(new Set(positions.flatMap(p => p.phases.map(ph => ph.name)))).map(phaseName => {
+                                                const phase = positions[0].phases.find(ph => ph.name === phaseName);
+                                                return phase ? (
+                                                    <option key={phase.id} value={phase.id}>
+                                                        {phase.name}
+                                                    </option>
+                                                ) : null;
+                                            })
+                                        )}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        採用者属性
+                                    </label>
+                                    <select
+                                        value={selectedAttribute}
+                                        onChange={(e) => setSelectedAttribute(e.target.value)}
+                                        className="w-full border rounded-lg px-3 py-2"
+                                    >
+                                        <option value="all">すべて</option>
+                                        {HIRING_ATTRIBUTES.map(attr => (
+                                            <option key={attr.value} value={attr.value}>
+                                                {attr.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* カスタムフィールドフィルタ */}
+                            <div className="border-t pt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-sm font-medium text-gray-700">カスタムフィールドで絞り込み</h4>
+                                    {customFieldFilters.length > 1 && (
+                                        <select
+                                            value={filterLogic}
+                                            onChange={(e) => setFilterLogic(e.target.value)}
+                                            className="text-sm border rounded px-2 py-1"
+                                        >
+                                            <option value="AND">すべての条件を満たす（AND）</option>
+                                            <option value="OR">いずれかの条件を満たす（OR）</option>
+                                        </select>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    {customFieldFilters.map((filter) => (
+                                        <div key={filter.id} className="flex items-center space-x-2">
+                                            <select
+                                                value={filter.fieldName}
+                                                onChange={(e) => updateCustomFieldFilter(filter.id, { fieldName: e.target.value })}
+                                                className="flex-1 border rounded px-2 py-1"
+                                            >
+                                                <option value="">フィールドを選択</option>
+                                                {availableCustomFields.map(field => (
+                                                    <option key={field.name} value={field.name}>
+                                                        {field.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                value={filter.operator}
+                                                onChange={(e) => updateCustomFieldFilter(filter.id, { operator: e.target.value })}
+                                                className="border rounded px-2 py-1"
+                                            >
+                                                <option value="equals">完全一致</option>
+                                                <option value="contains">部分一致</option>
+                                                <option value="startsWith">前方一致</option>
+                                                <option value="endsWith">後方一致</option>
+                                            </select>
+                                            <input
+                                                type="text"
+                                                value={filter.value}
+                                                onChange={(e) => updateCustomFieldFilter(filter.id, { value: e.target.value })}
+                                                placeholder="値を入力"
+                                                className="flex-1 border rounded px-2 py-1"
+                                            />
+                                            <button
+                                                onClick={() => removeCustomFieldFilter(filter.id)}
+                                                className="text-red-500 hover:text-red-600 p-1"
+                                            >
+                                                <X />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button
+                                    onClick={addCustomFieldFilter}
+                                    className="mt-2 text-sm text-blue-500 hover:text-blue-600"
+                                >
+                                    + カスタムフィールドの条件を追加
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 検索ボタン */}
+                        <div className="flex justify-center mb-6">
+                            <button
+                                onClick={executeSearch}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center space-x-2"
+                            >
+                                <Search />
+                                <span>検索実行</span>
+                            </button>
+                        </div>
+
+                        {/* 検索結果 */}
+                        {showResults && (
+                            <div className="border-t pt-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="font-medium">
+                                        検索結果: {results.length}件
+                                    </h4>
+                                    {results.length > 0 && (
+                                        <button
+                                            onClick={exportToCSV}
+                                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm"
+                                        >
+                                            <Download />
+                                            <span>CSVダウンロード</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {results.length > 0 ? (
+                                    <div className="max-h-96 overflow-y-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-gray-50 sticky top-0">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left">候補者名</th>
+                                                    <th className="px-4 py-2 text-left">ポジション</th>
+                                                    <th className="px-4 py-2 text-left">フェーズ</th>
+                                                    <th className="px-4 py-2 text-left">採用者属性</th>
+                                                    <th className="px-4 py-2 text-left">登録日</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {results.map((candidate, index) => (
+                                                    <tr key={`${candidate.id}-${index}`} className="border-b hover:bg-gray-50">
+                                                        <td className="px-4 py-2 font-medium">{candidate.name}</td>
+                                                        <td className="px-4 py-2">{candidate.positionName}</td>
+                                                        <td className="px-4 py-2">{candidate.phaseName}</td>
+                                                        <td className="px-4 py-2">
+                                                            {HIRING_ATTRIBUTES.find(a => a.value === candidate.hiringAttribute)?.label || '-'}
+                                                        </td>
+                                                        <td className="px-4 py-2">
+                                                            {new Date(candidate.createdAt).toLocaleDateString()}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-gray-500 py-8">
+                                        該当する候補者が見つかりませんでした
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end mt-6">
+                            <button
+                                onClick={onClose}
+                                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg"
+                            >
+                                閉じる
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         // フェーズ管理モーダル
         const PhaseManagementModal = ({ isOpen, phases, onUpdate, onClose }) => {
@@ -761,8 +1221,8 @@
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-100">
                     <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-                        <h2 className="text-2xl font-bold mb-6 text-center">サロウィン社内専用</h2>
-                        <p className="text-gray-600 mb-4 text-center">採用管理システム（チーム共有版）<br/>パスワードを入力してください</p>
+                        <h2 className="text-2xl font-bold mb-6 text-center">SALOWIN ATS</h2>
+                        <p className="text-gray-600 mb-4 text-center">サロウィン社内専用<br/>パスワードを入力してください</p>
                         <form onSubmit={handleSubmit}>
                             <input
                                 type="password"
@@ -1328,6 +1788,7 @@
             const [editingPosition, setEditingPosition] = useState(null);
             const [showAddPosition, setShowAddPosition] = useState(false);
             const [showPhaseManagement, setShowPhaseManagement] = useState(false);
+            const [showFilterModal, setShowFilterModal] = useState(false);
             const [newPosition, setNewPosition] = useState({
                 name: '',
                 department: '',
@@ -1804,15 +2265,24 @@
                     
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center space-x-4">
-                            <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（チーム共有版）</h1>
+                            <h1 className="text-2xl font-bold text-gray-800">SALOWIN ATS</h1>
                         </div>
-                        <button
-                            onClick={() => setShowAddPosition(true)}
-                            className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                        >
-                            <Plus />
-                            <span>新規ポジション追加</span>
-                        </button>
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={() => setShowFilterModal(true)}
+                                className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+                            >
+                                <Search />
+                                <span>候補者検索</span>
+                            </button>
+                            <button
+                                onClick={() => setShowAddPosition(true)}
+                                className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                            >
+                                <Plus />
+                                <span>新規ポジション追加</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1980,6 +2450,12 @@
                         onPositionChange={setNewPosition}
                         onAdd={addPosition}
                         onCancel={() => setShowAddPosition(false)}
+                    />
+
+                    <CandidateFilterModal
+                        isOpen={showFilterModal}
+                        positions={positions}
+                        onClose={() => setShowFilterModal(false)}
                     />
                 </div>
             );
