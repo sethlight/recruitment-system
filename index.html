@@ -18,6 +18,12 @@
             stroke-linecap: round; 
             stroke-linejoin: round; 
         }
+        .dragging {
+            opacity: 0.5;
+        }
+        .drag-over {
+            background-color: #e0e7ff;
+        }
     </style>
 </head>
 <body>
@@ -118,6 +124,29 @@
             </svg>
         );
 
+        const ChevronUp = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="m18 15-6-6-6 6"/>
+            </svg>
+        );
+
+        const ChevronDown = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="m6 9 6 6 6-6"/>
+            </svg>
+        );
+
+        const GripVertical = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <circle cx="9" cy="12" r="1"/>
+                <circle cx="9" cy="5" r="1"/>
+                <circle cx="9" cy="19" r="1"/>
+                <circle cx="15" cy="12" r="1"/>
+                <circle cx="15" cy="5" r="1"/>
+                <circle cx="15" cy="19" r="1"/>
+            </svg>
+        );
+
         // 採用者属性の定数
         const HIRING_ATTRIBUTES = [
           { value: 'experienced', label: '経験者' },
@@ -139,20 +168,20 @@
           { id: 'rejected', name: '不合格', color: 'bg-red-500' }
         ];
 
-        // 利用可能な色
+        // 利用可能な色（日本語表記付き）
         const AVAILABLE_COLORS = [
-          'bg-pink-500',
-          'bg-blue-500',
-          'bg-orange-500',
-          'bg-purple-500',
-          'bg-indigo-500',
-          'bg-green-500',
-          'bg-emerald-500',
-          'bg-red-500',
-          'bg-yellow-500',
-          'bg-cyan-500',
-          'bg-gray-500',
-          'bg-teal-500'
+          { value: 'bg-pink-500', label: 'ピンク', preview: '#ec4899' },
+          { value: 'bg-blue-500', label: '青', preview: '#3b82f6' },
+          { value: 'bg-orange-500', label: 'オレンジ', preview: '#f97316' },
+          { value: 'bg-purple-500', label: '紫', preview: '#a855f7' },
+          { value: 'bg-indigo-500', label: '藍色', preview: '#6366f1' },
+          { value: 'bg-green-500', label: '緑', preview: '#22c55e' },
+          { value: 'bg-emerald-500', label: 'エメラルド', preview: '#10b981' },
+          { value: 'bg-red-500', label: '赤', preview: '#ef4444' },
+          { value: 'bg-yellow-500', label: '黄色', preview: '#eab308' },
+          { value: 'bg-cyan-500', label: 'シアン', preview: '#06b6d4' },
+          { value: 'bg-gray-500', label: 'グレー', preview: '#6b7280' },
+          { value: 'bg-teal-500', label: 'ティール', preview: '#14b8a6' }
         ];
 
         // ナビゲーション履歴管理
@@ -382,6 +411,8 @@
         const PhaseManagementModal = ({ isOpen, phases, onUpdate, onClose }) => {
             const [editedPhases, setEditedPhases] = useState([]);
             const [newPhase, setNewPhase] = useState({ name: '', color: 'bg-blue-500' });
+            const [draggedIndex, setDraggedIndex] = useState(null);
+            const [dragOverIndex, setDragOverIndex] = useState(null);
 
             useEffect(() => {
                 if (isOpen && phases) {
@@ -423,6 +454,51 @@
                 setEditedPhases(updated);
             };
 
+            const handleDragStart = (e, index) => {
+                setDraggedIndex(index);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleDragOver = (e, index) => {
+                e.preventDefault();
+                setDragOverIndex(index);
+            };
+
+            const handleDragLeave = () => {
+                setDragOverIndex(null);
+            };
+
+            const handleDrop = (e, dropIndex) => {
+                e.preventDefault();
+                if (draggedIndex === null || draggedIndex === dropIndex) return;
+
+                const draggedPhase = editedPhases[draggedIndex];
+                const newPhases = [...editedPhases];
+                
+                // Remove dragged item
+                newPhases.splice(draggedIndex, 1);
+                
+                // Insert at new position
+                const adjustedDropIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
+                newPhases.splice(adjustedDropIndex, 0, draggedPhase);
+                
+                setEditedPhases(newPhases);
+                setDraggedIndex(null);
+                setDragOverIndex(null);
+            };
+
+            const movePhase = (index, direction) => {
+                const newIndex = index + direction;
+                if (newIndex < 0 || newIndex >= editedPhases.length) return;
+
+                const newPhases = [...editedPhases];
+                const temp = newPhases[index];
+                newPhases[index] = newPhases[newIndex];
+                newPhases[newIndex] = temp;
+                
+                setEditedPhases(newPhases);
+            };
+
             const handleSave = () => {
                 onUpdate(editedPhases);
                 onClose();
@@ -433,9 +509,24 @@
                     <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto">
                         <h3 className="text-lg font-semibold mb-4">フェーズ管理</h3>
                         
-                        <div className="space-y-4 mb-6">
+                        <div className="space-y-2 mb-6">
                             {editedPhases.map((phase, index) => (
-                                <div key={phase.id} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+                                <div 
+                                    key={phase.id} 
+                                    className={`flex items-center space-x-2 p-3 bg-gray-50 rounded-lg cursor-move ${
+                                        draggedIndex === index ? 'dragging' : ''
+                                    } ${
+                                        dragOverIndex === index ? 'drag-over' : ''
+                                    }`}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, index)}
+                                >
+                                    <div className="cursor-move text-gray-400">
+                                        <GripVertical />
+                                    </div>
                                     <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
                                     <input
                                         type="text"
@@ -449,11 +540,27 @@
                                         className="border rounded px-2 py-1"
                                     >
                                         {AVAILABLE_COLORS.map(color => (
-                                            <option key={color} value={color}>
-                                                {color.replace('bg-', '').replace('-500', '')}
+                                            <option key={color.value} value={color.value}>
+                                                {color.label}
                                             </option>
                                         ))}
                                     </select>
+                                    <div className="flex items-center space-x-1">
+                                        <button
+                                            onClick={() => movePhase(index, -1)}
+                                            disabled={index === 0}
+                                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-1"
+                                        >
+                                            <ChevronUp />
+                                        </button>
+                                        <button
+                                            onClick={() => movePhase(index, 1)}
+                                            disabled={index === editedPhases.length - 1}
+                                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-1"
+                                        >
+                                            <ChevronDown />
+                                        </button>
+                                    </div>
                                     <button
                                         onClick={() => handleDeletePhase(index)}
                                         className="text-red-500 hover:text-red-600 p-1"
@@ -480,17 +587,20 @@
                                     className="flex-1 border rounded px-2 py-1"
                                     onKeyPress={(e) => e.key === 'Enter' && handleAddPhase()}
                                 />
-                                <select
-                                    value={newPhase.color}
-                                    onChange={(e) => setNewPhase({ ...newPhase, color: e.target.value })}
-                                    className="border rounded px-2 py-1"
-                                >
-                                    {AVAILABLE_COLORS.map(color => (
-                                        <option key={color} value={color}>
-                                            {color.replace('bg-', '').replace('-500', '')}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="flex items-center space-x-2 border rounded px-2 py-1">
+                                    <div className={`w-4 h-4 rounded-full ${newPhase.color}`}></div>
+                                    <select
+                                        value={newPhase.color}
+                                        onChange={(e) => setNewPhase({ ...newPhase, color: e.target.value })}
+                                        className="border-none outline-none"
+                                    >
+                                        {AVAILABLE_COLORS.map(color => (
+                                            <option key={color.value} value={color.value}>
+                                                {color.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <button
                                     onClick={handleAddPhase}
                                     className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
@@ -498,6 +608,10 @@
                                     追加
                                 </button>
                             </div>
+                        </div>
+
+                        <div className="mt-4 text-xs text-gray-500">
+                            ※ フェーズはドラッグ&ドロップで並び替えできます
                         </div>
 
                         <div className="flex space-x-2 mt-6">
