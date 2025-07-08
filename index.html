@@ -24,14 +24,37 @@
         .drag-over {
             background-color: #e0e7ff;
         }
+        .highlight-candidate {
+            animation: highlight 2s ease-in-out;
+        }
+        @keyframes highlight {
+            0% { background-color: #fbbf24; }
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useCallback, useEffect, useMemo } = React;
+        const { useState, useCallback, useEffect, useMemo, useRef } = React;
 
-        // アイコンコンポーネント
+        // アイコンコンポーネント（既存のものに追加）
+        const Eye = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+        );
+
+        const FilterX = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="M13.013 3H2l8 9.46V19l4 2v-8.54l.9-1.055"/>
+                <line x1="22" x2="18" y1="3" y2="7"/>
+                <line x1="18" x2="22" y1="3" y2="7"/>
+            </svg>
+        );
+
+        // 既存のアイコンコンポーネント（Plus, User, Clock, など）はそのまま保持
         const Plus = () => (
             <svg className="lucide" viewBox="0 0 24 24">
                 <path d="M5 12h14M12 5v14"/>
@@ -455,8 +478,8 @@
             }
         }
 
-        // 候補者抽出モーダル
-        const CandidateFilterModal = ({ isOpen, positions, onClose }) => {
+        // 候補者抽出モーダル（改良版）
+        const CandidateFilterModal = ({ isOpen, positions, onClose, onNavigateToCandidate, onApplyFilter }) => {
             const [searchTerm, setSearchTerm] = useState('');
             const [selectedPosition, setSelectedPosition] = useState('all');
             const [selectedPhase, setSelectedPhase] = useState('all');
@@ -657,6 +680,24 @@
                 link.click();
             };
 
+            // 候補者へナビゲート
+            const handleNavigateToCandidate = (candidate) => {
+                onNavigateToCandidate(candidate.positionId, candidate.phaseId, candidate.id);
+                onClose();
+            };
+
+            // フィルタを適用して表示
+            const handleApplyFilter = () => {
+                if (results.length === 0) {
+                    alert('検索結果がありません。先に検索を実行してください。');
+                    return;
+                }
+                
+                const filteredCandidateIds = results.map(r => r.id);
+                onApplyFilter(filteredCandidateIds);
+                onClose();
+            };
+
             if (!isOpen) return null;
 
             return (
@@ -833,15 +874,26 @@
                                     <h4 className="font-medium">
                                         検索結果: {results.length}件
                                     </h4>
-                                    {results.length > 0 && (
-                                        <button
-                                            onClick={exportToCSV}
-                                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm"
-                                        >
-                                            <Download />
-                                            <span>CSVダウンロード</span>
-                                        </button>
-                                    )}
+                                    <div className="flex items-center space-x-2">
+                                        {results.length > 0 && (
+                                            <>
+                                                <button
+                                                    onClick={handleApplyFilter}
+                                                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm"
+                                                >
+                                                    <Filter />
+                                                    <span>この条件で絞り込む</span>
+                                                </button>
+                                                <button
+                                                    onClick={exportToCSV}
+                                                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm"
+                                                >
+                                                    <Download />
+                                                    <span>CSVダウンロード</span>
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {results.length > 0 ? (
@@ -854,6 +906,7 @@
                                                     <th className="px-4 py-2 text-left">フェーズ</th>
                                                     <th className="px-4 py-2 text-left">採用者属性</th>
                                                     <th className="px-4 py-2 text-left">登録日</th>
+                                                    <th className="px-4 py-2 text-center">操作</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -867,6 +920,15 @@
                                                         </td>
                                                         <td className="px-4 py-2">
                                                             {new Date(candidate.createdAt).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-4 py-2 text-center">
+                                                            <button
+                                                                onClick={() => handleNavigateToCandidate(candidate)}
+                                                                className="text-blue-500 hover:text-blue-600 inline-flex items-center space-x-1"
+                                                            >
+                                                                <Eye />
+                                                                <span>表示</span>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -894,7 +956,7 @@
             );
         };
 
-        // フェーズ管理モーダル
+        // フェーズ管理モーダル（変更なし）
         const PhaseManagementModal = ({ isOpen, phases, onUpdate, onClose }) => {
             const [editedPhases, setEditedPhases] = useState([]);
             const [newPhase, setNewPhase] = useState({ name: '', color: 'bg-blue-500' });
@@ -1120,7 +1182,7 @@
             );
         };
 
-        // 戻るボタンコンポーネント
+        // 戻るボタンコンポーネント（変更なし）
         const BackButton = ({ navigationHistory, onBack }) => {
             const [canGoBack, setCanGoBack] = useState(false);
             const [lastRoute, setLastRoute] = useState(null);
@@ -1161,7 +1223,7 @@
             );
         };
 
-        // 接続ステータス表示コンポーネント
+        // 接続ステータス表示コンポーネント（変更なし）
         const ConnectionStatus = ({ dbManager, dataSource, lastUpdate }) => {
             const [status, setStatus] = useState(dbManager.getConnectionStatus());
 
@@ -1205,7 +1267,7 @@
             );
         };
 
-        // ログインコンポーネント
+        // ログインコンポーネント（変更なし）
         const LoginComponent = ({ onLogin }) => {
             const [password, setPassword] = useState('');
             
@@ -1247,7 +1309,7 @@
             );
         };
 
-        // 候補者詳細モーダル
+        // 候補者詳細モーダル（変更なし）
         const CandidateDetailModal = ({ 
           isOpen, 
           candidate, 
@@ -1460,7 +1522,7 @@
           );
         };
 
-        // 候補者カード
+        // 候補者カード（フィルタ対応版）
         const CandidateCard = ({ 
           candidate, 
           phaseId, 
@@ -1470,7 +1532,9 @@
           selectedCandidate,
           onCandidateClick,
           onOpenDetail,
-          phases
+          phases,
+          isHighlighted,
+          candidateRef
         }) => {
           const [showMenu, setShowMenu] = useState(false);
           const [isEditing, setIsEditing] = useState(false);
@@ -1526,9 +1590,10 @@
 
           return (
             <div 
+              ref={candidateRef}
               className={`bg-white rounded-lg shadow-sm border-2 p-3 mb-2 hover:shadow-md transition-all relative cursor-pointer ${
                 isSelected ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
-              }`}
+              } ${isHighlighted ? 'highlight-candidate' : ''}`}
               draggable={isSelected}
               onClick={(e) => {
                 e.stopPropagation();
@@ -1694,7 +1759,7 @@
           );
         };
 
-        // ポジション追加モーダル
+        // ポジション追加モーダル（変更なし）
         const AddPositionModal = ({ isOpen, newPosition, onPositionChange, onAdd, onCancel }) => {
           if (!isOpen) return null;
 
@@ -1775,7 +1840,7 @@
           );
         };
 
-        // 採用管理システム
+        // 採用管理システム（改良版）
         const RecruitmentSystem = () => {
             const [dbManager] = useState(() => new DatabaseManager());
             const [navigationHistory] = useState(() => new NavigationHistory());
@@ -1789,6 +1854,9 @@
             const [showAddPosition, setShowAddPosition] = useState(false);
             const [showPhaseManagement, setShowPhaseManagement] = useState(false);
             const [showFilterModal, setShowFilterModal] = useState(false);
+            const [filteredCandidateIds, setFilteredCandidateIds] = useState(null);
+            const [highlightedCandidateId, setHighlightedCandidateId] = useState(null);
+            const candidateRefs = useRef({});
             const [newPosition, setNewPosition] = useState({
                 name: '',
                 department: '',
@@ -1859,6 +1927,7 @@
                 
                 setSelectedPosition(position);
                 setSelectedCandidate(null);
+                setFilteredCandidateIds(null); // フィルタをリセット
             }, [navigationHistory]);
 
             const handleBackNavigation = useCallback(() => {
@@ -1869,6 +1938,7 @@
                     if (previousRoute.type === 'position-list') {
                         setSelectedPosition(null);
                         setSelectedCandidate(null);
+                        setFilteredCandidateIds(null);
                     } else if (previousRoute.type === 'position-detail') {
                         // 特定のポジション詳細に戻る場合
                         const position = positions.find(p => p.id === previousRoute.id);
@@ -1885,8 +1955,43 @@
                     // 履歴がない場合は一覧に戻る
                     setSelectedPosition(null);
                     setSelectedCandidate(null);
+                    setFilteredCandidateIds(null);
                 }
             }, [navigationHistory, positions]);
+
+            // 候補者へナビゲート
+            const handleNavigateToCandidate = useCallback((positionId, phaseId, candidateId) => {
+                const position = positions.find(p => p.id === positionId);
+                if (position) {
+                    setSelectedPosition(position);
+                    setHighlightedCandidateId(candidateId);
+                    
+                    // 少し遅延を入れてからスクロール
+                    setTimeout(() => {
+                        if (candidateRefs.current[candidateId]) {
+                            candidateRefs.current[candidateId].scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                        }
+                        
+                        // ハイライトを3秒後に削除
+                        setTimeout(() => {
+                            setHighlightedCandidateId(null);
+                        }, 3000);
+                    }, 100);
+                }
+            }, [positions]);
+
+            // フィルタを適用
+            const handleApplyFilter = useCallback((candidateIds) => {
+                setFilteredCandidateIds(candidateIds);
+            }, []);
+
+            // フィルタをクリア
+            const clearFilter = useCallback(() => {
+                setFilteredCandidateIds(null);
+            }, []);
 
             // 候補者選択
             const handleCandidateClick = useCallback((candidate) => {
@@ -2130,6 +2235,7 @@
             // カンバンボード表示
             if (selectedPosition) {
                 const totalCandidates = selectedPosition.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
+                const filteredCount = filteredCandidateIds ? filteredCandidateIds.length : totalCandidates;
 
                 return (
                     <div className="p-6 bg-gray-100 min-h-screen pt-20">
@@ -2146,6 +2252,15 @@
                                     onBack={handleBackNavigation}
                                 />
                                 <div className="flex items-center space-x-2">
+                                    {filteredCandidateIds && (
+                                        <button
+                                            onClick={clearFilter}
+                                            className="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm"
+                                        >
+                                            <FilterX />
+                                            <span>フィルタ解除</span>
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setShowPhaseManagement(true)}
                                         className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm"
@@ -2157,79 +2272,104 @@
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
-                                <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
+                                <p className="text-gray-600">
+                                    {selectedPosition.department} | 
+                                    {filteredCandidateIds ? (
+                                        <span className="text-purple-600 font-medium">
+                                            {` フィルタ中: ${filteredCount}名 / ${totalCandidates}名`}
+                                        </span>
+                                    ) : (
+                                        ` 総候補者数: ${totalCandidates}名`
+                                    )}
+                                </p>
                             </div>
                         </div>
 
                         <div className="flex gap-4 overflow-x-auto pb-4">
-                            {selectedPosition.phases.map((phase) => (
-                                <div 
-                                    key={phase.id} 
-                                    className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
-                                        selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
-                                    }`}
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        e.dataTransfer.dropEffect = 'move';
-                                    }}
-                                    onDragEnter={(e) => e.preventDefault()}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                        if (data.candidateId && data.fromPhaseId !== phase.id) {
-                                            moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
-                                            setSelectedCandidate(null);
-                                        }
-                                    }}
-                                >
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center space-x-2">
-                                            <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
-                                            <h2 className="font-semibold text-gray-800">{phase.name}</h2>
-                                        </div>
-                                        <span className="text-sm text-gray-500">{phase.candidates.length}</span>
-                                    </div>
+                            {selectedPosition.phases.map((phase) => {
+                                const visibleCandidates = filteredCandidateIds 
+                                    ? phase.candidates.filter(c => filteredCandidateIds.includes(c.id))
+                                    : phase.candidates;
 
-                                    <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
-                                        {phase.candidates.map((candidate) => (
-                                            <CandidateCard
-                                                key={candidate.id}
-                                                candidate={candidate}
-                                                phaseId={phase.id}
-                                                selectedCandidate={selectedCandidate}
-                                                onCandidateClick={handleCandidateClick}
-                                                onOpenDetail={openCandidateDetail}
-                                                onUpdateCandidate={updateCandidate}
-                                                onMoveCandidate={moveCandidate}
-                                                onDeleteCandidate={deleteCandidate}
-                                                phases={selectedPosition.phases}
-                                            />
-                                        ))}
-                                        {phase.candidates.length === 0 && (
-                                            <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
-                                                まだ候補者がいません
+                                return (
+                                    <div 
+                                        key={phase.id} 
+                                        className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
+                                            selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
+                                        }`}
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            e.dataTransfer.dropEffect = 'move';
+                                        }}
+                                        onDragEnter={(e) => e.preventDefault()}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                                            if (data.candidateId && data.fromPhaseId !== phase.id) {
+                                                moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
+                                                setSelectedCandidate(null);
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center space-x-2">
+                                                <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
+                                                <h2 className="font-semibold text-gray-800">{phase.name}</h2>
                                             </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex items-center space-x-2 text-gray-500">
-                                        <Plus />
-                                        <input
-                                            type="text"
-                                            placeholder="候補者を追加"
-                                            value={newTaskInputs[phase.id] || ''}
-                                            onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    addCandidate(phase.id, newTaskInputs[phase.id]);
-                                                    setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
+                                            <span className="text-sm text-gray-500">
+                                                {filteredCandidateIds && visibleCandidates.length !== phase.candidates.length
+                                                    ? `${visibleCandidates.length} / ${phase.candidates.length}`
+                                                    : phase.candidates.length
                                                 }
-                                            }}
-                                            className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
-                                        />
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                                            {visibleCandidates.map((candidate) => (
+                                                <CandidateCard
+                                                    key={candidate.id}
+                                                    candidate={candidate}
+                                                    phaseId={phase.id}
+                                                    selectedCandidate={selectedCandidate}
+                                                    onCandidateClick={handleCandidateClick}
+                                                    onOpenDetail={openCandidateDetail}
+                                                    onUpdateCandidate={updateCandidate}
+                                                    onMoveCandidate={moveCandidate}
+                                                    onDeleteCandidate={deleteCandidate}
+                                                    phases={selectedPosition.phases}
+                                                    isHighlighted={highlightedCandidateId === candidate.id}
+                                                    candidateRef={(el) => candidateRefs.current[candidate.id] = el}
+                                                />
+                                            ))}
+                                            {visibleCandidates.length === 0 && (
+                                                <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
+                                                    {filteredCandidateIds && phase.candidates.length > 0
+                                                        ? 'フィルタ条件に該当する候補者がいません'
+                                                        : 'まだ候補者がいません'
+                                                    }
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center space-x-2 text-gray-500">
+                                            <Plus />
+                                            <input
+                                                type="text"
+                                                placeholder="候補者を追加"
+                                                value={newTaskInputs[phase.id] || ''}
+                                                onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        addCandidate(phase.id, newTaskInputs[phase.id]);
+                                                        setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
+                                                    }
+                                                }}
+                                                className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <PhaseManagementModal
@@ -2456,6 +2596,8 @@
                         isOpen={showFilterModal}
                         positions={positions}
                         onClose={() => setShowFilterModal(false)}
+                        onNavigateToCandidate={handleNavigateToCandidate}
+                        onApplyFilter={handleApplyFilter}
                     />
                 </div>
             );
