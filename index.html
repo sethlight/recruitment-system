@@ -54,6 +54,13 @@
             </svg>
         );
 
+        const Home = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+        );
+
         // 既存のアイコンコンポーネント（Plus, User, Clock, など）はそのまま保持
         const Plus = () => (
             <svg className="lucide" viewBox="0 0 24 24">
@@ -479,15 +486,22 @@
         }
 
         // 候補者抽出モーダル（改良版）
-        const CandidateFilterModal = ({ isOpen, positions, onClose, onNavigateToCandidate, onApplyFilter }) => {
+        const CandidateFilterModal = ({ isOpen, positions, onClose, onNavigateToCandidate, currentPositionId = null }) => {
             const [searchTerm, setSearchTerm] = useState('');
-            const [selectedPosition, setSelectedPosition] = useState('all');
+            const [selectedPosition, setSelectedPosition] = useState(currentPositionId || 'all');
             const [selectedPhase, setSelectedPhase] = useState('all');
             const [selectedAttribute, setSelectedAttribute] = useState('all');
             const [customFieldFilters, setCustomFieldFilters] = useState([]);
             const [filterLogic, setFilterLogic] = useState('AND');
             const [results, setResults] = useState([]);
             const [showResults, setShowResults] = useState(false);
+
+            // currentPositionIdが変更されたら反映
+            useEffect(() => {
+                if (currentPositionId) {
+                    setSelectedPosition(currentPositionId);
+                }
+            }, [currentPositionId]);
 
             // 全候補者から動的にカスタムフィールドを収集
             const availableCustomFields = useMemo(() => {
@@ -686,18 +700,6 @@
                 onClose();
             };
 
-            // フィルタを適用して表示
-            const handleApplyFilter = () => {
-                if (results.length === 0) {
-                    alert('検索結果がありません。先に検索を実行してください。');
-                    return;
-                }
-                
-                const filteredCandidateIds = results.map(r => r.id);
-                onApplyFilter(filteredCandidateIds);
-                onClose();
-            };
-
             if (!isOpen) return null;
 
             return (
@@ -876,22 +878,13 @@
                                     </h4>
                                     <div className="flex items-center space-x-2">
                                         {results.length > 0 && (
-                                            <>
-                                                <button
-                                                    onClick={handleApplyFilter}
-                                                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm"
-                                                >
-                                                    <Filter />
-                                                    <span>この条件で絞り込む</span>
-                                                </button>
-                                                <button
-                                                    onClick={exportToCSV}
-                                                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm"
-                                                >
-                                                    <Download />
-                                                    <span>CSVダウンロード</span>
-                                                </button>
-                                            </>
+                                            <button
+                                                onClick={exportToCSV}
+                                                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm"
+                                            >
+                                                <Download />
+                                                <span>CSVダウンロード</span>
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -1854,7 +1847,6 @@
             const [showAddPosition, setShowAddPosition] = useState(false);
             const [showPhaseManagement, setShowPhaseManagement] = useState(false);
             const [showFilterModal, setShowFilterModal] = useState(false);
-            const [filteredCandidateIds, setFilteredCandidateIds] = useState(null);
             const [highlightedCandidateId, setHighlightedCandidateId] = useState(null);
             const candidateRefs = useRef({});
             const [newPosition, setNewPosition] = useState({
@@ -1927,7 +1919,6 @@
                 
                 setSelectedPosition(position);
                 setSelectedCandidate(null);
-                setFilteredCandidateIds(null); // フィルタをリセット
             }, [navigationHistory]);
 
             const handleBackNavigation = useCallback(() => {
@@ -1938,7 +1929,6 @@
                     if (previousRoute.type === 'position-list') {
                         setSelectedPosition(null);
                         setSelectedCandidate(null);
-                        setFilteredCandidateIds(null);
                     } else if (previousRoute.type === 'position-detail') {
                         // 特定のポジション詳細に戻る場合
                         const position = positions.find(p => p.id === previousRoute.id);
@@ -1955,9 +1945,16 @@
                     // 履歴がない場合は一覧に戻る
                     setSelectedPosition(null);
                     setSelectedCandidate(null);
-                    setFilteredCandidateIds(null);
                 }
             }, [navigationHistory, positions]);
+
+            // ポジション一覧に戻る
+            const handleBackToPositionList = useCallback(() => {
+                navigationHistory.clear();
+                setSelectedPosition(null);
+                setSelectedCandidate(null);
+                setHighlightedCandidateId(null);
+            }, [navigationHistory]);
 
             // 候補者へナビゲート
             const handleNavigateToCandidate = useCallback((positionId, phaseId, candidateId) => {
@@ -1982,16 +1979,6 @@
                     }, 100);
                 }
             }, [positions]);
-
-            // フィルタを適用
-            const handleApplyFilter = useCallback((candidateIds) => {
-                setFilteredCandidateIds(candidateIds);
-            }, []);
-
-            // フィルタをクリア
-            const clearFilter = useCallback(() => {
-                setFilteredCandidateIds(null);
-            }, []);
 
             // 候補者選択
             const handleCandidateClick = useCallback((candidate) => {
@@ -2235,7 +2222,6 @@
             // カンバンボード表示
             if (selectedPosition) {
                 const totalCandidates = selectedPosition.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
-                const filteredCount = filteredCandidateIds ? filteredCandidateIds.length : totalCandidates;
 
                 return (
                     <div className="p-6 bg-gray-100 min-h-screen pt-20">
@@ -2247,20 +2233,27 @@
                         
                         <div className="mb-6">
                             <div className="flex items-center justify-between mb-4">
-                                <BackButton 
-                                    navigationHistory={navigationHistory}
-                                    onBack={handleBackNavigation}
-                                />
                                 <div className="flex items-center space-x-2">
-                                    {filteredCandidateIds && (
-                                        <button
-                                            onClick={clearFilter}
-                                            className="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm"
-                                        >
-                                            <FilterX />
-                                            <span>フィルタ解除</span>
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={handleBackToPositionList}
+                                        className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 transition-colors"
+                                    >
+                                        <Home />
+                                        <span className="text-sm">ポジション一覧に戻る</span>
+                                    </button>
+                                    <BackButton 
+                                        navigationHistory={navigationHistory}
+                                        onBack={handleBackNavigation}
+                                    />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => setShowFilterModal(true)}
+                                        className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm"
+                                    >
+                                        <Search />
+                                        <span>候補者検索</span>
+                                    </button>
                                     <button
                                         onClick={() => setShowPhaseManagement(true)}
                                         className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm"
@@ -2272,104 +2265,81 @@
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
-                                <p className="text-gray-600">
-                                    {selectedPosition.department} | 
-                                    {filteredCandidateIds ? (
-                                        <span className="text-purple-600 font-medium">
-                                            {` フィルタ中: ${filteredCount}名 / ${totalCandidates}名`}
-                                        </span>
-                                    ) : (
-                                        ` 総候補者数: ${totalCandidates}名`
-                                    )}
-                                </p>
+                                <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
                             </div>
                         </div>
 
                         <div className="flex gap-4 overflow-x-auto pb-4">
-                            {selectedPosition.phases.map((phase) => {
-                                const visibleCandidates = filteredCandidateIds 
-                                    ? phase.candidates.filter(c => filteredCandidateIds.includes(c.id))
-                                    : phase.candidates;
-
-                                return (
-                                    <div 
-                                        key={phase.id} 
-                                        className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
-                                            selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
-                                        }`}
-                                        onDragOver={(e) => {
-                                            e.preventDefault();
-                                            e.dataTransfer.dropEffect = 'move';
-                                        }}
-                                        onDragEnter={(e) => e.preventDefault()}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                            if (data.candidateId && data.fromPhaseId !== phase.id) {
-                                                moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
-                                                setSelectedCandidate(null);
-                                            }
-                                        }}
-                                    >
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center space-x-2">
-                                                <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
-                                                <h2 className="font-semibold text-gray-800">{phase.name}</h2>
-                                            </div>
-                                            <span className="text-sm text-gray-500">
-                                                {filteredCandidateIds && visibleCandidates.length !== phase.candidates.length
-                                                    ? `${visibleCandidates.length} / ${phase.candidates.length}`
-                                                    : phase.candidates.length
-                                                }
-                                            </span>
+                            {selectedPosition.phases.map((phase) => (
+                                <div 
+                                    key={phase.id} 
+                                    className={`min-w-80 bg-gray-50 rounded-lg p-4 transition-all ${
+                                        selectedCandidate ? 'border-2 border-dashed border-blue-300' : ''
+                                    }`}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                    }}
+                                    onDragEnter={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                                        if (data.candidateId && data.fromPhaseId !== phase.id) {
+                                            moveCandidate(data.candidateId, data.fromPhaseId, phase.id);
+                                            setSelectedCandidate(null);
+                                        }
+                                    }}
+                                >
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center space-x-2">
+                                            <div className={`w-4 h-4 rounded-full ${phase.color}`}></div>
+                                            <h2 className="font-semibold text-gray-800">{phase.name}</h2>
                                         </div>
-
-                                        <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
-                                            {visibleCandidates.map((candidate) => (
-                                                <CandidateCard
-                                                    key={candidate.id}
-                                                    candidate={candidate}
-                                                    phaseId={phase.id}
-                                                    selectedCandidate={selectedCandidate}
-                                                    onCandidateClick={handleCandidateClick}
-                                                    onOpenDetail={openCandidateDetail}
-                                                    onUpdateCandidate={updateCandidate}
-                                                    onMoveCandidate={moveCandidate}
-                                                    onDeleteCandidate={deleteCandidate}
-                                                    phases={selectedPosition.phases}
-                                                    isHighlighted={highlightedCandidateId === candidate.id}
-                                                    candidateRef={(el) => candidateRefs.current[candidate.id] = el}
-                                                />
-                                            ))}
-                                            {visibleCandidates.length === 0 && (
-                                                <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
-                                                    {filteredCandidateIds && phase.candidates.length > 0
-                                                        ? 'フィルタ条件に該当する候補者がいません'
-                                                        : 'まだ候補者がいません'
-                                                    }
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center space-x-2 text-gray-500">
-                                            <Plus />
-                                            <input
-                                                type="text"
-                                                placeholder="候補者を追加"
-                                                value={newTaskInputs[phase.id] || ''}
-                                                onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        addCandidate(phase.id, newTaskInputs[phase.id]);
-                                                        setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
-                                                    }
-                                                }}
-                                                className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
-                                            />
-                                        </div>
+                                        <span className="text-sm text-gray-500">{phase.candidates.length}</span>
                                     </div>
-                                );
-                            })}
+
+                                    <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                                        {phase.candidates.map((candidate) => (
+                                            <CandidateCard
+                                                key={candidate.id}
+                                                candidate={candidate}
+                                                phaseId={phase.id}
+                                                selectedCandidate={selectedCandidate}
+                                                onCandidateClick={handleCandidateClick}
+                                                onOpenDetail={openCandidateDetail}
+                                                onUpdateCandidate={updateCandidate}
+                                                onMoveCandidate={moveCandidate}
+                                                onDeleteCandidate={deleteCandidate}
+                                                phases={selectedPosition.phases}
+                                                isHighlighted={highlightedCandidateId === candidate.id}
+                                                candidateRef={(el) => candidateRefs.current[candidate.id] = el}
+                                            />
+                                        ))}
+                                        {phase.candidates.length === 0 && (
+                                            <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
+                                                まだ候補者がいません
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center space-x-2 text-gray-500">
+                                        <Plus />
+                                        <input
+                                            type="text"
+                                            placeholder="候補者を追加"
+                                            value={newTaskInputs[phase.id] || ''}
+                                            onChange={(e) => setNewTaskInputs(prev => ({ ...prev, [phase.id]: e.target.value }))}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    addCandidate(phase.id, newTaskInputs[phase.id]);
+                                                    setNewTaskInputs(prev => ({ ...prev, [phase.id]: '' }));
+                                                }
+                                            }}
+                                            className="flex-1 bg-transparent border-none outline-none placeholder-gray-400 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
                         <PhaseManagementModal
@@ -2389,6 +2359,14 @@
                                 setDetailEditingCandidate(null);
                                 setDetailEditingPhase(null);
                             }}
+                        />
+
+                        <CandidateFilterModal
+                            isOpen={showFilterModal}
+                            positions={positions}
+                            currentPositionId={selectedPosition.id}
+                            onClose={() => setShowFilterModal(false)}
+                            onNavigateToCandidate={handleNavigateToCandidate}
                         />
                     </div>
                 );
@@ -2597,7 +2575,6 @@
                         positions={positions}
                         onClose={() => setShowFilterModal(false)}
                         onNavigateToCandidate={handleNavigateToCandidate}
-                        onApplyFilter={handleApplyFilter}
                     />
                 </div>
             );
