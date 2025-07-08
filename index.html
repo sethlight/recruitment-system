@@ -551,7 +551,8 @@
                     id: Date.now(),
                     fieldName: '',
                     operator: 'equals',
-                    value: ''
+                    value: '',
+                    value2: ''
                 }]);
             };
 
@@ -565,6 +566,37 @@
             // フィルタ削除
             const removeCustomFieldFilter = (id) => {
                 setCustomFieldFilters(customFieldFilters.filter(filter => filter.id !== id));
+            };
+
+            // 演算子の選択肢を取得
+            const getOperatorsForField = (fieldName) => {
+                // フィールドの値から数値フィールドかどうかを判定
+                const isNumericField = positions.some(position =>
+                    position.phases.some(phase =>
+                        phase.candidates.some(candidate => {
+                            const field = candidate.customFields?.find(f => f.name === fieldName);
+                            return field && field.isNumeric;
+                        })
+                    )
+                );
+
+                if (isNumericField) {
+                    return [
+                        { value: 'equals', label: '完全一致' },
+                        { value: 'gte', label: '以上' },
+                        { value: 'gt', label: 'より大きい' },
+                        { value: 'lte', label: '以下' },
+                        { value: 'lt', label: 'より小さい' },
+                        { value: 'between', label: '範囲内' }
+                    ];
+                } else {
+                    return [
+                        { value: 'equals', label: '完全一致' },
+                        { value: 'contains', label: '部分一致' },
+                        { value: 'startsWith', label: '前方一致' },
+                        { value: 'endsWith', label: '後方一致' }
+                    ];
+                }
             };
 
             // 検索実行
@@ -610,20 +642,50 @@
                                     const field = candidate.customFields?.find(f => f.name === filter.fieldName);
                                     if (!field) return false;
 
-                                    const fieldValue = field.value.toLowerCase();
-                                    const filterValue = filter.value.toLowerCase();
+                                    // 数値フィールドの場合
+                                    if (field.isNumeric) {
+                                        const fieldValue = parseFloat(field.value.replace(/,/g, ''));
+                                        const filterValue = parseFloat(filter.value.replace(/,/g, ''));
+                                        
+                                        if (isNaN(fieldValue) || isNaN(filterValue)) return false;
 
-                                    switch (filter.operator) {
-                                        case 'equals':
-                                            return fieldValue === filterValue;
-                                        case 'contains':
-                                            return fieldValue.includes(filterValue);
-                                        case 'startsWith':
-                                            return fieldValue.startsWith(filterValue);
-                                        case 'endsWith':
-                                            return fieldValue.endsWith(filterValue);
-                                        default:
-                                            return true;
+                                        switch (filter.operator) {
+                                            case 'equals':
+                                                return fieldValue === filterValue;
+                                            case 'gte':
+                                                return fieldValue >= filterValue;
+                                            case 'gt':
+                                                return fieldValue > filterValue;
+                                            case 'lte':
+                                                return fieldValue <= filterValue;
+                                            case 'lt':
+                                                return fieldValue < filterValue;
+                                            case 'between':
+                                                if (filter.value2) {
+                                                    const filterValue2 = parseFloat(filter.value2.replace(/,/g, ''));
+                                                    return fieldValue >= filterValue && fieldValue <= filterValue2;
+                                                }
+                                                return true;
+                                            default:
+                                                return true;
+                                        }
+                                    } else {
+                                        // テキストフィールドの場合
+                                        const fieldValue = field.value.toLowerCase();
+                                        const filterValue = filter.value.toLowerCase();
+
+                                        switch (filter.operator) {
+                                            case 'equals':
+                                                return fieldValue === filterValue;
+                                            case 'contains':
+                                                return fieldValue.includes(filterValue);
+                                            case 'startsWith':
+                                                return fieldValue.startsWith(filterValue);
+                                            case 'endsWith':
+                                                return fieldValue.endsWith(filterValue);
+                                            default:
+                                                return true;
+                                        }
                                     }
                                 });
 
@@ -835,45 +897,64 @@
                                 </div>
 
                                 <div className="space-y-2">
-                                    {customFieldFilters.map((filter) => (
-                                        <div key={filter.id} className="flex items-center space-x-2">
-                                            <select
-                                                value={filter.fieldName}
-                                                onChange={(e) => updateCustomFieldFilter(filter.id, { fieldName: e.target.value })}
-                                                className="flex-1 border rounded px-2 py-1"
-                                            >
-                                                <option value="">フィールドを選択</option>
-                                                {availableCustomFields.map(field => (
-                                                    <option key={field.name} value={field.name}>
-                                                        {field.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <select
-                                                value={filter.operator}
-                                                onChange={(e) => updateCustomFieldFilter(filter.id, { operator: e.target.value })}
-                                                className="border rounded px-2 py-1"
-                                            >
-                                                <option value="equals">完全一致</option>
-                                                <option value="contains">部分一致</option>
-                                                <option value="startsWith">前方一致</option>
-                                                <option value="endsWith">後方一致</option>
-                                            </select>
-                                            <input
-                                                type="text"
-                                                value={filter.value}
-                                                onChange={(e) => updateCustomFieldFilter(filter.id, { value: e.target.value })}
-                                                placeholder="値を入力"
-                                                className="flex-1 border rounded px-2 py-1"
-                                            />
-                                            <button
-                                                onClick={() => removeCustomFieldFilter(filter.id)}
-                                                className="text-red-500 hover:text-red-600 p-1"
-                                            >
-                                                <X />
-                                            </button>
-                                        </div>
-                                    ))}
+                                    {customFieldFilters.map((filter) => {
+                                        const operators = filter.fieldName ? getOperatorsForField(filter.fieldName) : [];
+                                        
+                                        return (
+                                            <div key={filter.id} className="flex items-center space-x-2">
+                                                <select
+                                                    value={filter.fieldName}
+                                                    onChange={(e) => {
+                                                        updateCustomFieldFilter(filter.id, { 
+                                                            fieldName: e.target.value,
+                                                            operator: 'equals' // フィールド変更時は演算子をリセット
+                                                        });
+                                                    }}
+                                                    className="flex-1 border rounded px-2 py-1"
+                                                >
+                                                    <option value="">フィールドを選択</option>
+                                                    {availableCustomFields.map(field => (
+                                                        <option key={field.name} value={field.name}>
+                                                            {field.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <select
+                                                    value={filter.operator}
+                                                    onChange={(e) => updateCustomFieldFilter(filter.id, { operator: e.target.value })}
+                                                    className="border rounded px-2 py-1"
+                                                >
+                                                    {operators.map(op => (
+                                                        <option key={op.value} value={op.value}>
+                                                            {op.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <input
+                                                    type="text"
+                                                    value={filter.value}
+                                                    onChange={(e) => updateCustomFieldFilter(filter.id, { value: e.target.value })}
+                                                    placeholder={filter.operator === 'between' ? "最小値" : "値を入力"}
+                                                    className="flex-1 border rounded px-2 py-1"
+                                                />
+                                                {filter.operator === 'between' && (
+                                                    <input
+                                                        type="text"
+                                                        value={filter.value2 || ''}
+                                                        onChange={(e) => updateCustomFieldFilter(filter.id, { value2: e.target.value })}
+                                                        placeholder="最大値"
+                                                        className="flex-1 border rounded px-2 py-1"
+                                                    />
+                                                )}
+                                                <button
+                                                    onClick={() => removeCustomFieldFilter(filter.id)}
+                                                    className="text-red-500 hover:text-red-600 p-1"
+                                                >
+                                                    <X />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
                                 <button
