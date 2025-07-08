@@ -147,6 +147,21 @@
             </svg>
         );
 
+        const X = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+        );
+
+        const Calendar = () => (
+            <svg className="lucide" viewBox="0 0 24 24">
+                <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+                <line x1="16" x2="16" y1="2" y2="6"/>
+                <line x1="8" x2="8" y1="2" y2="6"/>
+                <line x1="3" x2="21" y1="10" y2="10"/>
+            </svg>
+        );
+
         // 採用者属性の定数
         const HIRING_ATTRIBUTES = [
           { value: 'experienced', label: '経験者' },
@@ -770,14 +785,18 @@
         }) => {
           const [editData, setEditData] = useState({
             name: candidate?.name || '',
-            notes: candidate?.notes || ''
+            notes: candidate?.notes || '',
+            customFields: candidate?.customFields || []
           });
+          const [newFieldName, setNewFieldName] = useState('');
+          const [editingFieldIndex, setEditingFieldIndex] = useState(null);
 
           React.useEffect(() => {
             if (candidate) {
               setEditData({
                 name: candidate.name || '',
-                notes: candidate.notes || ''
+                notes: candidate.notes || '',
+                customFields: candidate.customFields || []
               });
             }
           }, [candidate]);
@@ -785,14 +804,47 @@
           if (!isOpen || !candidate) return null;
 
           const handleSave = () => {
-            onUpdate(phaseId, candidate.id, editData);
+            const updatedData = {
+              ...editData,
+              updatedAt: new Date().toISOString()
+            };
+            onUpdate(phaseId, candidate.id, updatedData);
             onClose();
+          };
+
+          const handleAddField = () => {
+            if (!newFieldName.trim()) return;
+            
+            const newField = {
+              id: Date.now(),
+              name: newFieldName.trim(),
+              value: ''
+            };
+            
+            setEditData({
+              ...editData,
+              customFields: [...editData.customFields, newField]
+            });
+            setNewFieldName('');
+          };
+
+          const handleUpdateField = (index, updates) => {
+            const updatedFields = [...editData.customFields];
+            updatedFields[index] = { ...updatedFields[index], ...updates };
+            setEditData({ ...editData, customFields: updatedFields });
+          };
+
+          const handleDeleteField = (index) => {
+            const updatedFields = editData.customFields.filter((_, i) => i !== index);
+            setEditData({ ...editData, customFields: updatedFields });
           };
 
           return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <h3 className="text-lg font-semibold mb-4">候補者詳細編集</h3>
+                
+                {/* 基本情報 */}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -805,6 +857,7 @@
                       className="w-full border rounded-lg px-3 py-2"
                     />
                   </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       メモ・詳細情報
@@ -816,13 +869,86 @@
                       placeholder="候補者に関するメモや詳細情報を入力してください..."
                     />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    <strong>登録日:</strong> {new Date(candidate.createdAt).toLocaleDateString()}
+
+                  {/* カスタムフィールド */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">カスタムフィールド</h4>
+                    
+                    <div className="space-y-2 mb-4">
+                      {editData.customFields.map((field, index) => (
+                        <div key={field.id} className="flex items-start space-x-2">
+                          {editingFieldIndex === index ? (
+                            <input
+                              type="text"
+                              value={field.name}
+                              onChange={(e) => handleUpdateField(index, { name: e.target.value })}
+                              onBlur={() => setEditingFieldIndex(null)}
+                              onKeyPress={(e) => e.key === 'Enter' && setEditingFieldIndex(null)}
+                              className="w-32 border rounded px-2 py-1 text-sm"
+                              autoFocus
+                            />
+                          ) : (
+                            <label 
+                              className="w-32 text-sm text-gray-600 py-1 cursor-pointer hover:text-gray-800"
+                              onClick={() => setEditingFieldIndex(index)}
+                            >
+                              {field.name}
+                            </label>
+                          )}
+                          <input
+                            type="text"
+                            value={field.value}
+                            onChange={(e) => handleUpdateField(index, { value: e.target.value })}
+                            className="flex-1 border rounded px-2 py-1"
+                            placeholder="値を入力"
+                          />
+                          <button
+                            onClick={() => handleDeleteField(index)}
+                            className="text-red-500 hover:text-red-600 p-1"
+                          >
+                            <X />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={newFieldName}
+                        onChange={(e) => setNewFieldName(e.target.value)}
+                        placeholder="フィールド名"
+                        className="flex-1 border rounded px-2 py-1"
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddField()}
+                      />
+                      <button
+                        onClick={handleAddField}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                      >
+                        フィールド追加
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 日時情報 */}
+                  <div className="border-t pt-4 space-y-2">
+                    <div className="flex items-center text-xs text-gray-500">
+                      <Calendar className="mr-1" />
+                      <strong>登録日時:</strong>
+                      <span className="ml-1">{new Date(candidate.createdAt).toLocaleString()}</span>
+                    </div>
+                    {candidate.updatedAt && (
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Clock className="mr-1" />
+                        <strong>最終更新日時:</strong>
+                        <span className="ml-1">{new Date(candidate.updatedAt).toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* 移動履歴表示 */}
                   {candidate.history && candidate.history.length > 0 && (
-                    <div className="mt-4 pt-4 border-t">
+                    <div className="border-t pt-4">
                       <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
                         <History className="mr-1" />
                         フェーズ移動履歴
@@ -842,6 +968,7 @@
                     </div>
                   )}
                 </div>
+                
                 <div className="flex space-x-2 mt-6">
                   <button
                     onClick={onClose}
@@ -986,6 +1113,19 @@
               {candidate.notes && (
                 <div className="text-xs text-gray-600 mb-2 bg-gray-50 p-2 rounded max-h-16 overflow-y-auto">
                   {candidate.notes.length > 50 ? `${candidate.notes.substring(0, 50)}...` : candidate.notes}
+                </div>
+              )}
+
+              {candidate.customFields && candidate.customFields.length > 0 && (
+                <div className="text-xs text-gray-500 mb-2">
+                  {candidate.customFields.slice(0, 2).map((field) => (
+                    <div key={field.id} className="truncate">
+                      <span className="font-medium">{field.name}:</span> {field.value}
+                    </div>
+                  ))}
+                  {candidate.customFields.length > 2 && (
+                    <div className="text-blue-500">他{candidate.customFields.length - 2}件...</div>
+                  )}
                 </div>
               )}
 
@@ -1259,7 +1399,9 @@
                     name: candidateName.trim(),
                     notes: '',
                     createdAt: new Date().toISOString(),
-                    history: [] // 履歴を初期化
+                    updatedAt: new Date().toISOString(),
+                    history: [], // 履歴を初期化
+                    customFields: [] // カスタムフィールドを初期化
                 };
 
                 const updatedPositions = positions.map(position => {
@@ -1330,7 +1472,8 @@
                 // 候補者に履歴を追加
                 const updatedCandidate = {
                     ...candidate,
-                    history: [...(candidate.history || []), historyEntry]
+                    history: [...(candidate.history || []), historyEntry],
+                    updatedAt: new Date().toISOString()
                 };
 
                 const updatedPositions = positions.map(pos => {
@@ -1482,7 +1625,7 @@
                         />
                         
                         <div className="mb-6">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-4">
                                 <BackButton 
                                     navigationHistory={navigationHistory}
                                     onBack={handleBackNavigation}
@@ -1495,7 +1638,7 @@
                                     <span>フェーズ管理</span>
                                 </button>
                             </div>
-                            <div className="mt-4">
+                            <div>
                                 <h1 className="text-2xl font-bold text-gray-800">{selectedPosition.name}</h1>
                                 <p className="text-gray-600">{selectedPosition.department} | 総候補者数: {totalCandidates}名</p>
                             </div>
@@ -1817,10 +1960,10 @@
 
             return (
                 <div>
-                    <div className="absolute top-4 right-4 z-50">
+                    <div className="fixed top-4 right-4 z-40">
                         <button 
                             onClick={handleLogout}
-                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm"
+                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm shadow-lg"
                         >
                             ログアウト
                         </button>
