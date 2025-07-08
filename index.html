@@ -265,6 +265,10 @@
                 this.history = [];
                 this.saveHistory();
             }
+
+            hasHistory() {
+                return this.history.length > 1;
+            }
         }
 
         // データベース操作クラス
@@ -663,13 +667,13 @@
 
             useEffect(() => {
                 const currentRoute = navigationHistory.getCurrentRoute();
-                const hasHistory = navigationHistory.history.length > 1;
+                const hasHistory = navigationHistory.hasHistory();
                 
                 setCanGoBack(hasHistory);
                 if (hasHistory && navigationHistory.history.length >= 2) {
                     setLastRoute(navigationHistory.history[navigationHistory.history.length - 2]);
                 }
-            }, [navigationHistory]);
+            }, [navigationHistory.history]);
 
             if (!canGoBack) return null;
 
@@ -1772,10 +1776,6 @@
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center space-x-4">
                             <h1 className="text-2xl font-bold text-gray-800">採用ポジション管理（チーム共有版）</h1>
-                            <BackButton 
-                                navigationHistory={navigationHistory}
-                                onBack={handleBackNavigation}
-                            />
                         </div>
                         <button
                             onClick={() => setShowAddPosition(true)}
