@@ -1009,6 +1009,7 @@
         }) => {
           const [showMenu, setShowMenu] = useState(false);
           const [isEditing, setIsEditing] = useState(false);
+          const [showAllFields, setShowAllFields] = useState(false);
           const isSelected = selectedCandidate?.id === candidate.id;
 
           return (
@@ -1120,13 +1121,32 @@
 
               {candidate.customFields && candidate.customFields.length > 0 && (
                 <div className="text-xs text-gray-500 mb-2">
-                  {candidate.customFields.slice(0, 2).map((field) => (
+                  {(showAllFields ? candidate.customFields : candidate.customFields.slice(0, 5)).map((field) => (
                     <div key={field.id} className="truncate">
                       <span className="font-medium">{field.name}:</span> {field.value}
                     </div>
                   ))}
-                  {candidate.customFields.length > 2 && (
-                    <div className="text-blue-500">他{candidate.customFields.length - 2}件...</div>
+                  {candidate.customFields.length > 5 && !showAllFields && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllFields(true);
+                      }}
+                      className="text-blue-500 hover:text-blue-600 mt-1"
+                    >
+                      他{candidate.customFields.length - 5}件...
+                    </button>
+                  )}
+                  {showAllFields && candidate.customFields.length > 5 && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllFields(false);
+                      }}
+                      className="text-blue-500 hover:text-blue-600 mt-1"
+                    >
+                      折りたたむ
+                    </button>
                   )}
                 </div>
               )}
@@ -1619,7 +1639,7 @@
                 const totalCandidates = selectedPosition.phases.reduce((sum, phase) => sum + phase.candidates.length, 0);
 
                 return (
-                    <div className="p-6 bg-gray-100 min-h-screen">
+                    <div className="p-6 bg-gray-100 min-h-screen pt-20">
                         <ConnectionStatus 
                             dbManager={dbManager} 
                             dataSource={dataSource} 
@@ -1742,7 +1762,7 @@
 
             // メイン画面表示
             return (
-                <div className="p-6 bg-gray-100 min-h-screen">
+                <div className="p-6 bg-gray-100 min-h-screen pt-20">
                     <ConnectionStatus 
                         dbManager={dbManager} 
                         dataSource={dataSource} 
@@ -1964,7 +1984,7 @@
 
             return (
                 <div className="relative">
-                    <div className="fixed top-4 right-4 z-40">
+                    <div className="fixed top-4 right-4 z-30">
                         <button 
                             onClick={handleLogout}
                             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm shadow-lg flex items-center space-x-2"
