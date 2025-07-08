@@ -221,6 +221,21 @@
             </svg>
         );
 
+        // 数値フォーマット関数
+        const formatNumber = (value) => {
+            // 数値以外の文字を削除
+            const numericValue = value.replace(/[^\d]/g, '');
+            if (!numericValue) return '';
+            
+            // 3桁ごとにカンマを挿入
+            return Number(numericValue).toLocaleString('ja-JP');
+        };
+
+        // フォーマットされた数値を元に戻す
+        const unformatNumber = (value) => {
+            return value.replace(/,/g, '');
+        };
+
         // 採用者属性の定数
         const HIRING_ATTRIBUTES = [
           { value: 'experienced', label: '経験者' },
@@ -1196,47 +1211,6 @@
             );
         };
 
-        // 戻るボタンコンポーネント（変更なし）
-        const BackButton = ({ navigationHistory, onBack }) => {
-            const [canGoBack, setCanGoBack] = useState(false);
-            const [lastRoute, setLastRoute] = useState(null);
-
-            useEffect(() => {
-                const currentRoute = navigationHistory.getCurrentRoute();
-                const hasHistory = navigationHistory.hasHistory();
-                
-                setCanGoBack(hasHistory);
-                if (hasHistory && navigationHistory.history.length >= 2) {
-                    setLastRoute(navigationHistory.history[navigationHistory.history.length - 2]);
-                }
-            }, [navigationHistory.history]);
-
-            if (!canGoBack) return null;
-
-            const getBackButtonText = () => {
-                if (!lastRoute) return '前の画面に戻る';
-                
-                switch (lastRoute.type) {
-                    case 'position-list':
-                        return 'ポジション一覧に戻る';
-                    case 'position-detail':
-                        return `${lastRoute.name || '詳細画面'}に戻る`;
-                    default:
-                        return '前の画面に戻る';
-                }
-            };
-
-            return (
-                <button
-                    onClick={onBack}
-                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 transition-colors"
-                >
-                    <RotateCcw />
-                    <span className="text-sm">{getBackButtonText()}</span>
-                </button>
-            );
-        };
-
         // 接続ステータス表示コンポーネント（変更なし）
         const ConnectionStatus = ({ dbManager, dataSource, lastUpdate }) => {
             const [status, setStatus] = useState(dbManager.getConnectionStatus());
@@ -1323,7 +1297,7 @@
             );
         };
 
-        // 候補者詳細モーダル（変更なし）
+        // 候補者詳細モーダル（数値フォーマット対応版）
         const CandidateDetailModal = ({ 
           isOpen, 
           candidate, 
@@ -1366,7 +1340,8 @@
             const newField = {
               id: Date.now(),
               name: newFieldName.trim(),
-              value: ''
+              value: '',
+              isNumeric: false
             };
             
             setEditData({
@@ -1380,6 +1355,23 @@
             const updatedFields = [...editData.customFields];
             updatedFields[index] = { ...updatedFields[index], ...updates };
             setEditData({ ...editData, customFields: updatedFields });
+          };
+
+          const handleFieldValueChange = (index, value) => {
+            const field = editData.customFields[index];
+            
+            // 数値かどうかを判定
+            const numericOnly = value.replace(/[^\d]/g, '');
+            const isNumeric = numericOnly.length > 0 && value.replace(/,/g, '') === numericOnly;
+            
+            if (isNumeric) {
+              // 数値の場合はフォーマット
+              const formatted = formatNumber(value);
+              handleUpdateField(index, { value: formatted, isNumeric: true });
+            } else {
+              // 数値でない場合はそのまま
+              handleUpdateField(index, { value: value, isNumeric: false });
+            }
           };
 
           const handleDeleteField = (index) => {
@@ -1434,9 +1426,9 @@
                           <input
                             type="text"
                             value={field.value}
-                            onChange={(e) => handleUpdateField(index, { value: e.target.value })}
+                            onChange={(e) => handleFieldValueChange(index, e.target.value)}
                             className="flex-1 border rounded px-2 py-1"
-                            placeholder="値を入力"
+                            placeholder={field.isNumeric ? "数値を入力（自動で桁区切り）" : "値を入力"}
                           />
                           <button
                             onClick={() => handleDeleteField(index)}
@@ -1463,6 +1455,9 @@
                       >
                         フィールド追加
                       </button>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      ※ 数値を入力すると自動的に桁区切りが適用されます
                     </div>
                   </div>
                   
@@ -1926,12 +1921,6 @@
 
             // ナビゲーション管理
             const handlePositionSelect = useCallback((position) => {
-                // 現在の一覧状態を履歴に保存
-                navigationHistory.push({
-                    type: 'position-list',
-                    name: 'ポジション一覧'
-                });
-                
                 // 選択されたポジションの詳細を履歴に保存
                 navigationHistory.push({
                     type: 'position-detail',
@@ -1944,36 +1933,7 @@
                 setFilteredCandidateIds(null); // フィルタをリセット
             }, [navigationHistory]);
 
-            const handleBackNavigation = useCallback(() => {
-                const lastRoute = navigationHistory.pop(); // 現在のルートを削除
-                const previousRoute = navigationHistory.getCurrentRoute(); // 前のルートを取得
-                
-                if (previousRoute) {
-                    if (previousRoute.type === 'position-list') {
-                        setSelectedPosition(null);
-                        setSelectedCandidate(null);
-                        setFilteredCandidateIds(null);
-                    } else if (previousRoute.type === 'position-detail') {
-                        // 特定のポジション詳細に戻る場合
-                        const position = positions.find(p => p.id === previousRoute.id);
-                        if (position) {
-                            setSelectedPosition(position);
-                            setSelectedCandidate(null);
-                        } else {
-                            // ポジションが見つからない場合は一覧に戻る
-                            setSelectedPosition(null);
-                            setSelectedCandidate(null);
-                        }
-                    }
-                } else {
-                    // 履歴がない場合は一覧に戻る
-                    setSelectedPosition(null);
-                    setSelectedCandidate(null);
-                    setFilteredCandidateIds(null);
-                }
-            }, [navigationHistory, positions]);
-
-            // ポジション一覧に戻る
+            // ポジション一覧に戻る（統合版）
             const handleBackToPositionList = useCallback(() => {
                 navigationHistory.clear();
                 setSelectedPosition(null);
@@ -2278,10 +2238,6 @@
                                         <Home />
                                         <span className="text-sm">ポジション一覧に戻る</span>
                                     </button>
-                                    <BackButton 
-                                        navigationHistory={navigationHistory}
-                                        onBack={handleBackNavigation}
-                                    />
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     {filteredCandidateIds && (
